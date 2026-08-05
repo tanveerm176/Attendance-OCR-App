@@ -1,0 +1,55 @@
+# release.yml should trigger only on tags matching v*.*.*. Its steps are:
+
+# Checkout code
+# Set up Python
+# Install dependencies
+# Run pytest — if this fails the workflow stops and no release is cut
+# Install PyInstaller (pip install pyinstaller)
+# Install Tesseract on the runner (sudo apt-get install -y tesseract-ocr)
+# Run PyInstaller to build the .exe
+# Create a GitHub Release using the tag name
+# Upload the built .exe as a release asset to that release
+
+name: Release
+
+on:
+  push:
+    tags:
+        -"v*.*.*"
+
+jobs:
+  build-and-release:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+        
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+        
+      - name: Install PyInstaller
+        run: pip install pyinstaller
+        
+      - name: Run tests
+        run: pytest tests/ -v
+        
+      - name: Build exe
+        run: |
+          pyinstaller --onefile \
+            --add-data "VERSION;." \
+            --add-data "tessdata;tessdata"\
+            main.py
+        
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/main.exe
+        env:
+          GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
+        
