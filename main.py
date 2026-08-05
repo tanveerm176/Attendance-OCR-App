@@ -1,5 +1,8 @@
+from updater import check_for_update
+
 def main():
 
+    check_for_update()
     # 1. parse CLI args
     #    --input (folder path)
     #    --roster (file path)
