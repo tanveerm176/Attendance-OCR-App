@@ -17,8 +17,8 @@ def get_vertical_line_positions(gray_img: np.ndarray) -> list[int]:
     # Morphological operations in OpenCV process white pixels as
     #  foreground objects and black pixels as background
     _, binary = cv2.threshold(gray_img, 150, 255, cv2.THRESH_BINARY_INV)
-    veritcal_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (1,100))
-    v_lines = cv2.morphologyEx(binary, cv2.MORPH_OPEN, veritcal_kernel)
+    vertical_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (1,100))
+    v_lines = cv2.morphologyEx(binary, cv2.MORPH_OPEN, vertical_kernel)
 
     # Stage2: Sum pixels down each COLUMN of image bin matrix,
     #  produce 1D array of how many white pixels exist in the COLUMN 
