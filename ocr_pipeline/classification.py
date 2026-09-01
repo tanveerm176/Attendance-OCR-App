@@ -35,15 +35,15 @@ def classify_attendance(cell_img_rgb: np.ndarray) -> str:
     # if neither color has enough saturated pixels to decide, 
     #   fall back to RGB channel difference on all ink pixels
     if red_count < 20 and blue_count < 20:
-        blue_channel = cell_img_rgb[:, :, 0].astype(float)
-        red_channel = cell_img_rgb[:, :, 2].astype(float)
+        red_channel = cell_img_rgb[:, :, 0].astype(float)
+        blue_channel = cell_img_rgb[:, :, 2].astype(float)
 
         mask = not_background
 
         blue_mean = blue_channel[mask].mean()
         red_mean = red_channel[mask].mean()
 
-        if (red_mean - blue_mean) > -20:
+        if (red_mean - blue_mean) > -10:
             attendance_status = 'Absent'
         else:
             attendance_status = 'Present'
