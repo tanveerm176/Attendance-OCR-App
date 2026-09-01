@@ -21,7 +21,7 @@ def fuzzy_match_names(df: pd.DataFrame, roster: list[str],
             match_scores.append(result[1])
 
         else:
-            matched_names.append(result[0])
+            matched_names.append(result[0] if result else None)
             match_scores.append(result[1] if result else 0)
 
     df['matched_name'] = matched_names
