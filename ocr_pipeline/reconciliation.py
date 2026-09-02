@@ -66,9 +66,12 @@ def fuzzy_match_names(df: pd.DataFrame, roster: list[str],
             flags.append(STRONG_MATCH_LABEL) # match_score >= 80
 
 
-    df['Cleaned Name'] = cleaned_names
-    df['Matched Name'] = matched_names
-    df['Matched Score'] = matched_scores
-    df['Raised Flags'] = flags
+    df['cleaned_name'] = cleaned_names
+    df['macthed_name'] = matched_names
+    df['matched_score'] = matched_scores
+    df['flag'] = flags
 
     return df
+
+# KEEP IN MIND: NEED TO REFACTOR FUZZYMATCH 
+# SO IT TAKES A SINGLE ROW INSTEAD OF THE ENTIRE DATAFRAME
