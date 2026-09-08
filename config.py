@@ -15,7 +15,10 @@ class PipelineConfig:
     attendance_col_index_start: int = 3
     attendance_col_index_end: int = 5
 
-    fuzzy_match_threshold: int = 80
     tesseract_config: str = "--oem 1 --psm 7"
+
+    fuzzy_match_threshold: int = 80
+    low_match_floor: int = 30
+    
     
 
