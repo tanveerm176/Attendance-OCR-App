@@ -1,8 +1,9 @@
 import fitz
 import numpy as np
-from config import DPI
+from ocr_pipeline.config import DPI
+import cv2
 
-def load_pdf(pdf_path: str) -> np.ndarray:
+def pdf_to_image(pdf_path: str) -> tuple[np.ndarray, np.ndarray]:
     """
     Opens a scanned PDF, renders the first page at 300 DPI,
     and returns it as an RGB numpy array.
@@ -30,6 +31,8 @@ def load_pdf(pdf_path: str) -> np.ndarray:
         pixmap.height, pixmap.width, pixmap.n
         )
 
+    img_gray = cv2.cvtColor(img_rgb, cv2.COLOR_RGB2GRAY)
+
     pdf_document.close()
     
-    return img_rgb
+    return img_rgb, img_gray

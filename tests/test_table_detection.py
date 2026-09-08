@@ -1,7 +1,7 @@
 import pytest
 import cv2
 import numpy as np
-from ocr_pipeline.ingestion import load_pdf
+from ocr_pipeline.ingestion import pdf_to_image
 from ocr_pipeline.table_detection import get_vertical_line_positions, get_horizontal_line_positions
 from pathlib import Path
 
@@ -10,7 +10,7 @@ SAMPLE_PDF = Path("tests/sample_scans/sonyc-test.pdf")
 ### pytest.fixture, for image loading and dependency injection
 @pytest.fixture
 def sample_image():
-    img_rgb = load_pdf(str(SAMPLE_PDF))
+    img_rgb = pdf_to_image(str(SAMPLE_PDF))
     img_gray = cv2.cvtColor(img_rgb, cv2.COLOR_RGB2GRAY)
     return img_gray
 
