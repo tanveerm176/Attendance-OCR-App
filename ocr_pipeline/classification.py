@@ -2,6 +2,9 @@ import numpy as np
 import cv2
 
 def classify_attendance(cell_img_rgb: np.ndarray) -> str:
+    # --- Assert input image is RGB ---
+    assert cell_img_rgb.ndim == 3, f'Expected RGB Image with 3 channels, received {cell_img_rgb.shape}'
+
     # --- Stage 0: image conversion ---
     # convert RGB image to HSV for more accurate color analysis
 

@@ -12,7 +12,10 @@ def get_vertical_line_positions(gray_img: np.ndarray) -> list[int]:
     Returns:
         vertical_line_positions: sorted list of x pixel coordinates
     """
-    # Stage1: Create a binary version of the image and invert
+    # --- Stage 0: Assert input image is grayscale ---
+    assert gray_img.ndim == 2, f'Expected Grayscale Image with 2 channels, received {gray_img.shape}'
+
+    # --- Stage 1: Create a binary version of the image and invert ---
     # Set pixels < 150 to 0 and pixels > 150 to 255 
     # Morphological operations in OpenCV process white pixels as
     #  foreground objects and black pixels as background
@@ -20,8 +23,8 @@ def get_vertical_line_positions(gray_img: np.ndarray) -> list[int]:
     vertical_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (1,100))
     v_lines = cv2.morphologyEx(binary, cv2.MORPH_OPEN, vertical_kernel)
 
-    # Stage2: Sum pixels down each COLUMN of image bin matrix,
-    #  produce 1D array of how many white pixels exist in the COLUMN 
+    # --- Stage 2: Sum pixels down each COLUMN of image bin matrix ----
+    #   produce 1D array of how many white pixels exist in the COLUMN 
     # Peaks indicate vertical line positions
     col_sums = np.sum(v_lines, axis=0) # axis=0 -> cols instead of axis=1
 
@@ -29,7 +32,7 @@ def get_vertical_line_positions(gray_img: np.ndarray) -> list[int]:
     line_threshold = np.max(col_sums) * 0.3 
     line_cols = np.where(col_sums > line_threshold)[0]
 
-    # Stage3: Cluster nearby columns together
+    # --- Stage 3: Cluster nearby columns together ---
     vertical_line_positions = []
 
     if len(line_cols) > 0:
@@ -64,6 +67,8 @@ def get_horizontal_line_positions(gray_img: np.ndarray) -> list[int]:
     Returns:
         horizontal_line_positions: sorted list of y pixel coordinates
     """
+    assert gray_img.ndim == 2, f'Expected Grayscale Image with 2 channels, received {gray_img.shape}'
+
     _, binary = cv2.threshold(gray_img, 150, 255, cv2.THRESH_BINARY_INV)
     horizontal_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (105,1))
     h_lines = cv2.morphologyEx(binary, cv2.MORPH_OPEN, horizontal_kernel)
