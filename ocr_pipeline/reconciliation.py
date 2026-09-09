@@ -15,7 +15,8 @@ def clean_ocr_name(name: str) -> str:
     return cleaned_spaces_name
 
 def fuzzy_match_names(df: pd.DataFrame, roster: list[str],
-                      name_col: str ='ocr_raw', threshold: int = 80) -> pd.DataFrame:
+                      name_col: str ='ocr_raw', threshold: int = 80, 
+                      low_match_floor: int = 30) -> pd.DataFrame:
 
     cleaned_names = []
     matched_names = []
@@ -30,7 +31,7 @@ def fuzzy_match_names(df: pd.DataFrame, roster: list[str],
         #   punctuation-only). No point handing this to the fuzzy matcher, 
         #   add None as the match_name, 0 for match_score, 
         #   and flag with OCRExtractionError & move to next name in column 
-        if not cleaned or len(cleaned)<2:
+        if not cleaned or len(cleaned) < 2:
             matched_names.append(None)
             matched_scores.append(0)
             flags.append(OCRExtractionError.__name__)
@@ -56,7 +57,7 @@ def fuzzy_match_names(df: pd.DataFrame, roster: list[str],
         # Case 2: a match was found, but the match_score is below the noise floor 
         #   flag is as effectively no match, but keep the best guess name/score 
         #   for manual review
-        if match_score < LOW_MATCH_SCORE_FLOOR:
+        if match_score < low_match_floor:
             flags.append(NoMatchFoundError.__name__)
 
         elif match_score < threshold:
