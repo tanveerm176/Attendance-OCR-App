@@ -42,7 +42,9 @@ class OCRPipeline:
             raise TableDetectionError(
                 f"Expected at least 2 horizontal lines to establish one table row,"
                 f"found {len(horizontal_lines)}"
+                # cv2.imwrite("reporting/debug_table_crop.png", cv2.cvtColor(table_img_rgb, cv2.COLOR_RGB2BGR))
             )
+        
 
         # --- Stage 5: Iterate over Table Rows, Extract Name, Classify Attendance
         # x-coordinates rebased against table_img_rgb's shifted origin
@@ -184,4 +186,6 @@ the point of this pass is to confirm the shape headed from one stage to the next
         df["matched_name"] = None
         df["match_score"] = 0
         df["flag"] = "STUB"
-        return df"""""""""
+        return df
+
+"""""""""
