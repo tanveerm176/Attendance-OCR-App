@@ -1,8 +1,9 @@
-
-
 from pathlib import Path
+
+import cv2
 import pandas as pd
 
+from ocr_pipeline import ingestion, table_detection, img_cropping, ocr, classification, reconciliation
 from ocr_pipeline.config import PipelineConfig
 from ocr_pipeline.exceptions import TableDetectionError
 
@@ -10,7 +11,85 @@ class OCRPipeline:
     def __init__(self, config: PipelineConfig):
         self.config = config
 
-    
+    def run(self, pdf_path: Path) -> pd.DataFrame:
+        cfg = self.config
+
+        # --- Stage 1: PDF Ingestion -> RGB ONLY ---
+        img_rgb = ingestion.pdf_to_image(pdf_path)
+
+        # --- Stage 2: Vertical Line Detection ---
+        img_gray = cv2.cvtColor(img_rgb, cv2.COLOR_RGB2GRAY)
+        vertical_lines = table_detection.get_vertical_line_positions(img_gray)
+
+        if len(vertical_lines) <= cfg.img_crop_end:
+            raise TableDetectionError(
+                f"Expected at least {cfg.img_crop_end + 1} vertical lines,"
+                f"found {len(vertical_lines)}"
+            )
+        
+        # --- Stage 3: Crop Image Vertically to Table Region ---
+        # (line 0 -> img_crop_end)
+        table_x_start = vertical_lines[cfg.img_crop_start]
+        table_x_end = vertical_lines[cfg.img_crop_end]
+
+        table_img_rgb = img_cropping.vertical_img_crop(img_rgb, table_x_start, table_x_end)
+
+        # --- Stage 4: Horizontal Line Detection ---
+        table_img_gray = cv2.cvtColor(table_img_rgb, cv2.COLOR_RGB2GRAY)
+        horizontal_lines = table_detection.get_horizontal_line_positions(table_img_gray)
+
+        if len(horizontal_lines) < 2:
+            raise TableDetectionError(
+                f"Expected at least 2 horizontal lines to establish one table row,"
+                f"found {len(horizontal_lines)}"
+            )
+
+        # --- Stage 5: Iterate over Table Rows, Extract Name, Classify Attendance
+        # x-coordinates rebased against table_img_rgb's shifted origin
+        # (table_x_start subtracted, since vertical_lines was detected on
+        # the *original* full-page image, not the cropped table).
+        name_x_start = vertical_lines[cfg.name_col_start] - table_x_start
+        name_x_end = vertical_lines[cfg.name_col_end] - table_x_start
+
+        attendance_x_start = vertical_lines[cfg.attendance_col_start] - table_x_start
+        attendance_x_end = vertical_lines[cfg.attendance_col_end] - table_x_start
+
+        ocr_names = []
+        attendance_statuses = []
+
+        # Skip Header, splice horizontal_lines[]
+        horizontal_lines = horizontal_lines[cfg.skip_header_start_row:]
+
+        # Iterate over all rows
+        for line_index in range(len(horizontal_lines) -1 ):
+            row_top_line, row_bottom_line = horizontal_lines[line_index], horizontal_lines[line_index+1]
+            table_row_rgb = img_cropping.horizontal_img_crop(table_img_rgb, row_top_line, row_bottom_line)
+            
+            # Name sub-crop -> grayscale (tesseract_ocr requires Grayscale Img input)
+            name_crop_rgb = img_cropping.vertical_img_crop(table_row_rgb, name_x_start, name_x_end)
+            name_crop_gray = cv2.cvtColor(name_crop_rgb, cv2.COLOR_RGB2GRAY)
+            ocr_name = ocr.tesseract_ocr(name_crop_gray, cfg.tesseract_config)
+
+            # Attendance sub-crop -> stays RGB for color classification
+            attendance_crop_rgb = img_cropping.vertical_img_crop(table_row_rgb, attendance_x_start, attendance_x_end)
+            attendance_status = classification.classify_attendance(attendance_crop_rgb)
+
+            ocr_names.append(ocr_name)
+            attendance_statuses.append(attendance_status)
+
+        # --- Stage 6: Assemble Raw Dataframe ---
+        attendance_df = pd.DataFrame({'ocr_raw': ocr_names, 'attendance': attendance_statuses})
+
+        # --- Stage 7: Reconciliation (clean + fuzzy_match + flag)
+        reconciled_df = reconciliation.fuzzy_match_names(attendance_df, 
+                                                         cfg.roster,
+                                                         threshold = cfg.fuzzy_match_threshold,
+                                                         low_match_floor = cfg.low_match_floor)
+
+        # return Reconciled DataFrame
+        # NOTE: no date prompt, no excel export here - main.py handles that
+        return reconciled_df
+
 """""""""   
 
 Orchestrator for the attendance OCR pipeline
