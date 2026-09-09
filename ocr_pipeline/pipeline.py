@@ -1,10 +1,4 @@
-"""Orchestrator for the attendance OCR pipeline
 
-Pass 1: skeleton only. Every stage below returns a hardcoded stub value.
-No real calls into ingestion/table_detection/img_cropping/classification/reconciliation yet - 
-the point of this pass is to confirm the shape headed from one stage to the next before wiring anything real in
-(Pass 2)
-"""
 
 from pathlib import Path
 import pandas as pd
@@ -13,6 +7,21 @@ from ocr_pipeline.config import PipelineConfig
 from ocr_pipeline.exceptions import TableDetectionError
 
 class OCRPipeline:
+    def __init__(self, config: PipelineConfig):
+        self.config = config
+
+    
+"""""""""   
+
+Orchestrator for the attendance OCR pipeline
+
+Pass 1: skeleton only. Every stage below returns a hardcoded stub value.
+No real calls into ingestion/table_detection/img_cropping/classification/reconciliation yet - 
+the point of this pass is to confirm the shape headed from one stage to the next before wiring anything real in
+(Pass 2)
+    ---- PASS 1: SKELETON ----
+
+
     def __init__(self, config: PipelineConfig) -> None:
         self.config = config
 
@@ -96,4 +105,4 @@ class OCRPipeline:
         df["matched_name"] = None
         df["match_score"] = 0
         df["flag"] = "STUB"
-        return df
+        return df"""""""""
