@@ -128,14 +128,15 @@ def main():
     # stamp date as the first column
     df.insert(0,'Date',sheet_date)
 
-    output_path = build_excel_output(pdf_path, sheet_date)
-    export_attendance(df, output_path)
-
     pd.set_option('display.max_rows', None)
     pd.set_option('display.max_colwidth', None)
     print(df)
 
-    print(f"Done - {len(df)} rows written to {output_path}")
+    # output_path = build_excel_output(pdf_path, sheet_date)
+    # export_attendance(df, output_path)
+
+
+    # print(f"Done - {len(df)} rows written to {output_path}")
     # End the timer
     end_time = time.perf_counter()
 

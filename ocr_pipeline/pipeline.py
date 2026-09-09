@@ -62,6 +62,16 @@ class OCRPipeline:
         # Skip Header, splice horizontal_lines[]
         horizontal_lines = horizontal_lines[cfg.skip_header_start_row:]
 
+        debug_name_crop_raw = table_img_rgb[horizontal_lines[8]:horizontal_lines[9], name_x_start:name_x_end]
+        debug_name_crop_raw = cv2.cvtColor(debug_name_crop_raw, cv2.COLOR_RGB2GRAY)
+        cv2.imwrite("debug_name_crop_raw.png", debug_name_crop_raw)
+
+
+        debug_name_crop_binary = ocr.preprocess_for_ocr(debug_name_crop_raw)
+        cv2.imwrite("debug_name_crop_binary.png", debug_name_crop_binary)
+
+        print(f"Name Extracted: {ocr.tesseract_ocr(debug_name_crop_raw)}")
+
         # Iterate over all rows
         for line_index in range(len(horizontal_lines) -1 ):
             row_top_line, row_bottom_line = horizontal_lines[line_index], horizontal_lines[line_index+1]
