@@ -38,7 +38,7 @@ def fuzzy_match_names(df: pd.DataFrame, roster: list[str],
             continue
 
         # For names that pass Case 1, send to fuzzy_matcher
-        result = process.extractOne(raw_name, roster, scorer=fuzz.token_sort_ratio)
+        result = process.extractOne(cleaned, roster, scorer=fuzz.token_sort_ratio)
 
         if not result:
             # extractOne can return None if roster is empty — distinct from
@@ -52,7 +52,7 @@ def fuzzy_match_names(df: pd.DataFrame, roster: list[str],
         #   match_score > 80 threshold applied here
         match_name, match_score, _ = result
         matched_names.append(match_name)
-        matched_scores.append(match_score)
+        matched_scores.append(round(match_score, 2))
 
         # Case 2: a match was found, but the match_score is below the noise floor 
         #   flag is as effectively no match, but keep the best guess name/score 
@@ -68,7 +68,7 @@ def fuzzy_match_names(df: pd.DataFrame, roster: list[str],
 
 
     df['cleaned_name'] = cleaned_names
-    df['macthed_name'] = matched_names
+    df['matched_name'] = matched_names
     df['matched_score'] = matched_scores
     df['flag'] = flags
 

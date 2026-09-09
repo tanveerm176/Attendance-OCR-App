@@ -12,5 +12,4 @@ def build_roster() -> list[str]:
             cleaned_name = re.sub(r'[\n\r,]', '', line)
             student_roster.append(cleaned_name.strip())
 
-    print(student_roster)
     return student_roster

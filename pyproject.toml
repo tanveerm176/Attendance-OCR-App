@@ -13,8 +13,9 @@ dependencies = [
     "pytesseract",
     "PyMuPDF",
     "rapidfuzz",
+    "openpyxl",
 ]
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["ocr_pipeline*"]
+include = ["ocr_pipeline*", "io_utils*"]
