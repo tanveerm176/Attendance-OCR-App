@@ -12,5 +12,6 @@ SAMPLE_NAME_SCAN = Path("tests/sample_scans/cell_student_name.png")
 def test_img_to_str():
     img_array = cv2.imread(SAMPLE_NAME_SCAN)
     assert img_array is not None
+    img_array = cv2.cvtColor(img_array, cv2.COLOR_RGB2GRAY)
     ocr_name = tesseract_ocr(img_array)
     assert isinstance(ocr_name, str)
