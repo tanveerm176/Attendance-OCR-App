@@ -17,8 +17,7 @@ def preprocess_for_ocr(gray_img: np.ndarray) -> np.ndarray:
     
     return processed
 
-def tesseract_ocr(image_cell_gray: np.ndarray, tesseract_config: str = r'--oem 1 --psm 7') -> str:
+def tesseract_ocr(image_cell_gray: np.ndarray) -> str:
     assert image_cell_gray.ndim == 2, f'Expected Grayscale Image with 2 channels, received {image_cell_gray.shape}'
     processed = preprocess_for_ocr(image_cell_gray)
-    # return pytesseract.image_to_string(processed, config=tesseract_config)
     return pytesseract.image_to_string(processed)

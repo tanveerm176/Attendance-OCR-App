@@ -62,15 +62,21 @@ class OCRPipeline:
         # Skip Header, splice horizontal_lines[]
         horizontal_lines = horizontal_lines[cfg.skip_header_start_row:]
 
-        debug_name_crop_raw = table_img_rgb[horizontal_lines[8]:horizontal_lines[9], name_x_start:name_x_end]
-        debug_name_crop_raw = cv2.cvtColor(debug_name_crop_raw, cv2.COLOR_RGB2GRAY)
-        cv2.imwrite("debug_name_crop_raw.png", debug_name_crop_raw)
+        # # --------------- DEBUG IMAGE GENERATION -------------------------------
+        # debug_name_crop_raw = table_img_rgb[horizontal_lines[12]:horizontal_lines[13], name_x_start:name_x_end]
+        # debug_name_crop_raw = cv2.cvtColor(debug_name_crop_raw, cv2.COLOR_RGB2GRAY)
+        # cv2.imwrite("debug_name_crop_raw.png", debug_name_crop_raw)
 
+        # debug_name_crop_binary = ocr.preprocess_for_ocr(debug_name_crop_raw)
+        # cv2.imwrite("debug_name_crop_binary.png", debug_name_crop_binary)
+        # # --------------- DEBUG IMAGE GENERATION -------------------------------
 
-        debug_name_crop_binary = ocr.preprocess_for_ocr(debug_name_crop_raw)
-        cv2.imwrite("debug_name_crop_binary.png", debug_name_crop_binary)
+        # # --------------- SIGNATURE IMAGE GENERATION -------------------------------
+        # debug_signature_crop = table_img_rgb[horizontal_lines[12]:horizontal_lines[13], attendance_x_start:attendance_x_end]
+        # cv2.imwrite("debug_signature_crop.png", cv2.cvtColor(debug_signature_crop, cv2.COLOR_BGR2RGB))
+        # # --------------- SIGNATURE IMAGE GENERATION -------------------------------
 
-        print(f"Name Extracted: {ocr.tesseract_ocr(debug_name_crop_raw)}")
+        # print(f"Name Extracted: {ocr.tesseract_ocr(debug_name_crop_raw)}")
 
         # Iterate over all rows
         for line_index in range(len(horizontal_lines) -1 ):
@@ -80,7 +86,7 @@ class OCRPipeline:
             # Name sub-crop -> grayscale (tesseract_ocr requires Grayscale Img input)
             name_crop_rgb = img_cropping.vertical_img_crop(table_row_rgb, name_x_start, name_x_end)
             name_crop_gray = cv2.cvtColor(name_crop_rgb, cv2.COLOR_RGB2GRAY)
-            ocr_name = ocr.tesseract_ocr(name_crop_gray, cfg.tesseract_config)
+            ocr_name = ocr.tesseract_ocr(name_crop_gray)
 
             # Attendance sub-crop -> stays RGB for color classification
             attendance_crop_rgb = img_cropping.vertical_img_crop(table_row_rgb, attendance_x_start, attendance_x_end)

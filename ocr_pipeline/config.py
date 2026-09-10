@@ -28,8 +28,5 @@ class PipelineConfig:
     attendance_col_start: int = 3
     attendance_col_end: int = 5
 
-    # Config for tesseract OCR to treat input as single line of text
-    tesseract_config: str = "--oem 1 --psm 7"
-
     fuzzy_match_threshold: int = 80
     low_match_floor: int = 30
