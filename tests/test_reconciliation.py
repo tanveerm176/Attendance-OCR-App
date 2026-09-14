@@ -7,7 +7,7 @@ SAMPLE_DF = pd.read_csv('tests/sample_data/OCR_Name_Attendance.csv')
 
 def build_roster():
     student_roster = []
-    with open("data/student_roster.txt", "r", encoding="utf-8") as file:
+    with open("tests/sample_data/sample_roster.txt", "r", encoding="utf-8") as file:
         for line in file:
             comma_stripped_name = re.sub(r',', '', line)
             student_roster.append(comma_stripped_name)
