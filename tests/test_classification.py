@@ -2,8 +2,8 @@ from pathlib import Path
 import cv2
 from ocr_pipeline.classification import classify_attendance
 
-PRESENT_CELL = Path('tests/sample_scans/present_cell.png')
-ABSENT_CELL = Path('tests/sample_scans/absent_cell.png')
+PRESENT_CELL = Path('tests/sample_data/present_cell.png')
+ABSENT_CELL = Path('tests/sample_data/absent_cell.png')
 
 present_img = cv2.imread(PRESENT_CELL)
 assert present_img is not None
