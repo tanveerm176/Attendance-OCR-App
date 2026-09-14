@@ -3,7 +3,7 @@ import pytest
 from pathlib import Path
 from ocr_pipeline.ingestion import pdf_to_image
 
-SAMPLE_PDF = Path("tests/sample_scans/sonyc-test.pdf")
+SAMPLE_PDF = Path("tests/sample_data/sonyc-test.pdf")
 
 "Test the PDF loaded is returned as a np array"
 def test_load_pdf_returns_numpy_array():

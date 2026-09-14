@@ -3,7 +3,7 @@ import pandas as pd
 import re
 
 SAMPLE_OCR_NAME = 'Ciutron, Tyler 7 |'
-SAMPLE_DF = pd.read_csv('tests/sample_scans/OCR_Name_Attendance.csv')
+SAMPLE_DF = pd.read_csv('tests/sample_data/OCR_Name_Attendance.csv')
 
 def build_roster():
     student_roster = []
@@ -20,4 +20,4 @@ def test_clean_ocr_name():
 def test_fuzzy_match_names():
     student_roster_list = build_roster()
     df_fuzzy_names = fuzzy_match_names(SAMPLE_DF, student_roster_list, name_col='OCR Names')
-    df_fuzzy_names.to_csv("./tests/sample_scans/df_fuzzy_names.csv", index=False)
+    df_fuzzy_names.to_csv("tests/sample_data/df_fuzzy_names.csv", index=False)

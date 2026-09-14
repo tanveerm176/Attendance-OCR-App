@@ -7,7 +7,7 @@ import cv2
 # Pass in image of text, verify str matches 
 # Pass in image of text, verify that output of preprocess is image (np.ndarray)
 
-SAMPLE_NAME_SCAN = Path("tests/sample_scans/cell_student_name.png")
+SAMPLE_NAME_SCAN = Path("tests/sample_data/cell_student_name.png")
 
 def test_img_to_str():
     img_array = cv2.imread(SAMPLE_NAME_SCAN)
