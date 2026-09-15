@@ -46,9 +46,9 @@ jobs:
         
       - name: Build exe
         run: |
-          pyinstaller --onefile \
-            --add-data "VERSION;." \
-            --add-data "tessdata;tessdata"\
+          pyinstaller --onefile `
+            --add-data "VERSION;." `
+            --add-data "tessdata;tessdata"`
             main.py
         
       - name: Create GitHub Release
