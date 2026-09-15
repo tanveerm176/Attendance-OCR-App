@@ -33,9 +33,9 @@ class OCRPipeline:
         table_x_end = vertical_lines[cfg.img_crop_end]
 
         table_img_rgb = img_cropping.vertical_img_crop(img_rgb, table_x_start, table_x_end)
+        table_img_gray = cv2.cvtColor(table_img_rgb, cv2.COLOR_RGB2GRAY)
 
         # --- Stage 4: Horizontal Line Detection ---
-        table_img_gray = cv2.cvtColor(table_img_rgb, cv2.COLOR_RGB2GRAY)
         horizontal_lines = table_detection.get_horizontal_line_positions(table_img_gray)
 
         if len(horizontal_lines) < 2:
@@ -59,8 +59,13 @@ class OCRPipeline:
         ocr_names = []
         attendance_statuses = []
 
-        # Skip Header, splice horizontal_lines[]
-        horizontal_lines = horizontal_lines[cfg.skip_header_start_row:]
+        # Skip Header if not Main Page, splice horizontal_lines[]
+        page_header = img_cropping.horizontal_img_crop(table_img_gray, 0, horizontal_lines[0])
+        print(f'Page Header Height: {page_header.shape[0]}')
+        # cv2.imwrite("page_header.png", page_header)
+        if page_header.shape[0] >= 400:
+            print('On Main Page')
+            horizontal_lines = horizontal_lines[cfg.skip_header_start_row:]   
 
         # # --------------- DEBUG IMAGE GENERATION -------------------------------
         # debug_name_crop_raw = table_img_rgb[horizontal_lines[12]:horizontal_lines[13], name_x_start:name_x_end]
@@ -101,7 +106,7 @@ class OCRPipeline:
         written_names_gray = cv2.cvtColor(written_names, cv2.COLOR_BGR2GRAY)
         # cv2.imwrite("written_names_gray.png", written_names_gray)
         written_flag = ocr.detect_handwritten_names(written_names_gray)
-        print(written_flag)
+        # print(written_flag)
 
         # --- Stage 6: Assemble Raw Dataframe ---
         attendance_df = pd.DataFrame({'ocr_raw': ocr_names, 'attendance': attendance_statuses})

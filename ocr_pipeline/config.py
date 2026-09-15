@@ -14,11 +14,8 @@ class PipelineConfig:
     img_crop_start: int = 0
     img_crop_end: int = 5
 
-    # Skip Header if scanned pdf is 1st page of sign in sheet
+    # Skip Header if scanned pdf is not 1st page of sign in sheet
     skip_header_start_row = 2
-
-    # For pages other than 1st page
-    default_start_row = 0
 
     # Used to isolate Name column for OCR pass
     name_col_start: int = 1
