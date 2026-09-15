@@ -27,6 +27,13 @@ def fuzzy_match_names(df: pd.DataFrame, roster: list[str],
         cleaned = clean_ocr_name(raw_name)
         cleaned_names.append(cleaned)
 
+        if cleaned == 'WRITTEN NAME DETECTED':
+            matched_names.append(None)
+            matched_scores.append(0.0)
+            flags.append('NEED-MANUAL-ENTRY')
+            continue
+
+
         # Case 1: nothing usable survived cleaning (empty, numeric-only,
         #   punctuation-only). No point handing this to the fuzzy matcher, 
         #   add None as the match_name, 0 for match_score, 
@@ -65,6 +72,8 @@ def fuzzy_match_names(df: pd.DataFrame, roster: list[str],
 
         else:
             flags.append(STRONG_MATCH_LABEL) # match_score >= 80
+
+
 
 
     df['cleaned_name'] = cleaned_names
