@@ -1,7 +1,19 @@
+import os
 import cv2
 import numpy as np
 import pytesseract
-pytesseract.pytesseract.tesseract_cmd = r'C:\Users\mtanveer\AppData\Local\Programs\Tesseract-OCR\tesseract.exe'
+
+# pytesseract.pytesseract.tesseract_cmd = r'C:\Users\mtanveer\AppData\Local\Programs\Tesseract-OCR\tesseract.exe'
+
+# Only override pytesseract's default PATH-based lookup if TESSERACT_CMD
+# is explicitly set. Local dev machines without Tesseract on PATH should
+# set this in their own environment; CI and properly-configured machines
+# rely on PATH resolution automatically.    
+
+tesseract_cmd = os.getenv("TESSERACT_CMD")
+if tesseract_cmd:
+    pytesseract.pytesseract.tesseract_cmd = tesseract_cmd
+
 
 def preprocess_for_ocr(gray_img: np.ndarray) -> np.ndarray:
     # 2. Threshold (Invert: White text/line on Black background)

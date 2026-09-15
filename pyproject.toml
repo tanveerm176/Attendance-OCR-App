@@ -14,6 +14,7 @@ dependencies = [
     "PyMuPDF",
     "rapidfuzz",
     "openpyxl",
+    "python-dotenv",
 ]
 
 [tool.setuptools.packages.find]

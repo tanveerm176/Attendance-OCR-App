@@ -64,6 +64,8 @@ Responsibilities kept here, deliberately not in pipeline.py:
 
     # 12. write log
     #     reporting.logger.write_log(batch_df, args.output)
+from dotenv import load_dotenv
+load_dotenv()  # populates os.environ from .env, before anything else runs
 
 import time
 import tkinter as tk

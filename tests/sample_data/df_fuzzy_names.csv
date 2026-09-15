@@ -1,8 +1,8 @@
 Date,OCR Names,Attendance Status,cleaned_name,matched_name,matched_score,flag
-01/07/2026,Aca Hernandez Kevin,Present,Aca Hernandez Kevin,"Aca Hernandez Kevin
-",100.0,Strong Match
-01/07/2026,Aca Hernandez william,Present,Aca Hernandez william,"Aca Hernandez William
-",95.24,Strong Match
+01/07/2026,Aca Hernandez Kevin,Present,Aca Hernandez Kevin,"Alvarez Rosalinda
+",44.44,Low Match - Needs Review
+01/07/2026,Aca Hernandez william,Present,Aca Hernandez william,"Alvarez Rosalinda
+",47.37,Low Match - Needs Review
 01/07/2026,Alatorre Vanessa,Present,Alatorre Vanessa,"Alatorre Vanessa
 ",100.0,Strong Match
 01/07/2026,Amodovar Emma,Present,Amodovar Emma,"Almodovar Emma
@@ -21,27 +21,26 @@ Date,OCR Names,Attendance Status,cleaned_name,matched_name,matched_score,flag
 ",93.33,Strong Match
 01/07/2026,Attala WMariolina,Absent,Attala WMariolina,"Attaalla Mariolina
 ",91.43,Strong Match
-01/07/2026,Bonilla Lian,Present,Bonilla Lian,"Bonilla Lian
-",100.0,Strong Match
-01/07/2026,Calle Alicia,Present,Calle Alicia,"Calle Alicia
-",100.0,Strong Match
-01/07/2026,Campoverde Michael,Absent,Campoverde Michael,"Campoverde Michael
-",100.0,Strong Match
-01/07/2026,Carrillo Liam,Absent,Carrillo Liam,"Carrillo Liam
-",100.0,Strong Match
-01/07/2026,Cetino Dylan,Absent,Cetino Dylan,"Cetino Dylan
-",100.0,Strong Match
-01/07/2026,Chau Edan,Present,Chau Edan,"Chau Edan
-",100.0,Strong Match
-01/07/2026,Chen Alva,Absent,Chen Alva,"Chen Alva
-",100.0,Strong Match
-01/07/2026,Chey Lillian,Absent,Chey Lillian,"Chen Lillian
-",91.67,Strong Match
-01/07/2026,Ciutron Tyler,Present,Ciutron Tyler,"Cintron Tyler
-",92.31,Strong Match
-01/07/2026,Cubero Sofia,Absent,Cubero Sofia,"Cubero Sofia
-",100.0,Strong Match
-01/07/2026,Cuevas Pallo,Absent,Cuevas Pallo,"Cuevas Pablo
-",91.67,Strong Match
-01/07/2026,De Kushum,Present,De Kushum,"Dc Kushum
-",88.89,Strong Match
+01/07/2026,Bonilla Lian,Present,Bonilla Lian,"Attaalla Mariolina
+",40.0,Low Match - Needs Review
+01/07/2026,Calle Alicia,Present,Calle Alicia,"Alvarracin Matthew
+",46.67,Low Match - Needs Review
+01/07/2026,Campoverde Michael,Absent,Campoverde Michael,Bermejo Mely,46.67,Low Match - Needs Review
+01/07/2026,Carrillo Liam,Absent,Carrillo Liam,"Alvarracin Matthew
+",38.71,Low Match - Needs Review
+01/07/2026,Cetino Dylan,Absent,Cetino Dylan,"Aquino Kylah
+",58.33,Low Match - Needs Review
+01/07/2026,Chau Edan,Present,Chau Edan,"Araujo Pablo
+",38.1,Low Match - Needs Review
+01/07/2026,Chen Alva,Absent,Chen Alva,"Almodovar Nathan
+",56.0,Low Match - Needs Review
+01/07/2026,Chey Lillian,Absent,Chey Lillian,"Batanov Aleksey
+",37.04,Low Match - Needs Review
+01/07/2026,Ciutron Tyler,Present,Ciutron Tyler,"Aquino Kylah
+",40.0,Low Match - Needs Review
+01/07/2026,Cubero Sofia,Absent,Cubero Sofia,"Ayers Nyla
+",36.36,Low Match - Needs Review
+01/07/2026,Cuevas Pallo,Absent,Cuevas Pallo,"Araujo Pablo
+",50.0,Low Match - Needs Review
+01/07/2026,De Kushum,Present,De Kushum,"Aquino Kylah
+",28.57,NoMatchFoundError
