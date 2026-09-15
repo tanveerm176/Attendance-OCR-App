@@ -31,7 +31,7 @@ jobs:
           python-version: "3.14"
         
       - name: Install dependencies
-        run: pip install -r requirements.txt
+        run: pip install -e ".[dev]" --break-system-packages
         
       - name: Install PyInstaller
         run: pip install pyinstaller

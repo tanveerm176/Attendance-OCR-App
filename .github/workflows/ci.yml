@@ -30,7 +30,7 @@ jobs:
           run: sudo apt-get install -y tesseract-ocr
 
         - name: Install dependencies
-          run: pip install -e .
+          run: pip install -e ".[dev]" --break-system-packages
 
         - name: Run tests
           run: pytest tests/ -v

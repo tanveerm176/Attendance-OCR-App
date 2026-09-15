@@ -17,6 +17,11 @@ dependencies = [
     "python-dotenv",
 ]
 
+[project.optional-dependencies]
+dev = [
+    "pytest",
+]
+
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["ocr_pipeline*", "io_utils*"]
