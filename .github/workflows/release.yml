@@ -29,6 +29,9 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.14"
+
+      - name: Install Tesseract
+        run: choco install tesseract --version=5.3.3 -y
         
       - name: Install dependencies
         run: pip install -e ".[dev]" --break-system-packages
