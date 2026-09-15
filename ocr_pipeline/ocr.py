@@ -33,3 +33,15 @@ def tesseract_ocr(image_cell_gray: np.ndarray) -> str:
     assert image_cell_gray.ndim == 2, f'Expected Grayscale Image with 2 channels, received {image_cell_gray.shape}'
     processed = preprocess_for_ocr(image_cell_gray)
     return pytesseract.image_to_string(processed)
+
+
+def detect_handwritten_names(image_cell_gray: np.ndarray) -> bool:
+    handwritten_flag = False
+
+    written_ocr = tesseract_ocr(image_cell_gray)
+    # print(written_ocr)
+    
+    if written_ocr != '':
+        handwritten_flag = True
+
+    return handwritten_flag 

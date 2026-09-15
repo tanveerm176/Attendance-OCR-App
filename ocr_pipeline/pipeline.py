@@ -79,7 +79,7 @@ class OCRPipeline:
         # print(f"Name Extracted: {ocr.tesseract_ocr(debug_name_crop_raw)}")
 
         # Iterate over all rows
-        for line_index in range(len(horizontal_lines) -1 ):
+        for line_index in range(len(horizontal_lines) - 1):
             row_top_line, row_bottom_line = horizontal_lines[line_index], horizontal_lines[line_index+1]
             table_row_rgb = img_cropping.horizontal_img_crop(table_img_rgb, row_top_line, row_bottom_line)
             
@@ -95,8 +95,20 @@ class OCRPipeline:
             ocr_names.append(ocr_name)
             attendance_statuses.append(attendance_status)
 
+        # ---- Detect Handwritten Names at Bottom of Sheet if any ----
+        written_section = img_cropping.horizontal_img_crop(table_img_rgb, horizontal_lines[-1], table_img_rgb.shape[0])
+        written_names = img_cropping.vertical_img_crop(written_section, name_x_start, name_x_end)
+        written_names_gray = cv2.cvtColor(written_names, cv2.COLOR_BGR2GRAY)
+        # cv2.imwrite("written_names_gray.png", written_names_gray)
+        written_flag = ocr.detect_handwritten_names(written_names_gray)
+        print(written_flag)
+
         # --- Stage 6: Assemble Raw Dataframe ---
         attendance_df = pd.DataFrame({'ocr_raw': ocr_names, 'attendance': attendance_statuses})
+
+        if written_flag:
+            manual_entry = pd.DataFrame([{'ocr_raw': 'WRITTEN NAME DETECTED', 'attendance': 'Present'}])
+            attendance_df = pd.concat([attendance_df, manual_entry], ignore_index=True)
 
         # --- Stage 7: Reconciliation (clean + fuzzy_match + flag)
         reconciled_df = reconciliation.fuzzy_match_names(attendance_df, 
@@ -104,7 +116,6 @@ class OCRPipeline:
                                                          threshold = cfg.fuzzy_match_threshold,
                                                          low_match_floor = cfg.low_match_floor)
 
-        # return Reconciled DataFrame
         # NOTE: no date prompt, no excel export here - main.py handles that
         return reconciled_df
 
