@@ -3,9 +3,11 @@ from pathlib import Path
 import cv2
 import pandas as pd
 
-from ocr_pipeline import ingestion, table_detection, img_cropping, ocr, classification, reconciliation
+from ocr_pipeline import ingestion, table_detection, img_cropping, ocr, classification, reconciliation, rotate
 from ocr_pipeline.config import PipelineConfig
 from ocr_pipeline.exceptions import TableDetectionError
+import matplotlib.pyplot as plt
+import matplotlib.image as mpimg
 
 class OCRPipeline:
     def __init__(self, config: PipelineConfig):
@@ -17,8 +19,17 @@ class OCRPipeline:
         # --- Stage 1: PDF Ingestion -> RGB ONLY ---
         img_rgb = ingestion.pdf_to_image(pdf_path)
 
-        # --- Stage 2: Vertical Line Detection ---
+        # --- Stage 1.5: PDF Rotation ---
         img_gray = cv2.cvtColor(img_rgb, cv2.COLOR_RGB2GRAY)
+        osd_dict = rotate.detect_rotation(img_gray)
+
+        if osd_dict['rotate'] != 0:
+            img_gray = rotate.rotate_image(img_gray, osd_dict['rotate'])
+            img_rgb = rotate.rotate_image(img_rgb, osd_dict['rotate'])
+
+        # --- Stage 2: Vertical Line Detection ---
+        # plt.imshow(img_gray, cmap='gray')
+        # plt.show()
         vertical_lines = table_detection.get_vertical_line_positions(img_gray)
 
         if len(vertical_lines) <= cfg.img_crop_end:

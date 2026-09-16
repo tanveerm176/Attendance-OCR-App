@@ -1,6 +1,5 @@
 import fitz
 import numpy as np
-import cv2
 from ocr_pipeline.config import DPI
 from pathlib import Path
 
@@ -13,7 +12,7 @@ def pdf_to_image(pdf_path: Path) -> np.ndarray:
         pdf_path: path to the scanned PDF file
 
     Returns:
-        img_rgb: HxWx3 numpy array in RGB color space
+        img_rgb: H x W x 3 numpy array in RGB color space
     """
     pdf_document = fitz.open(pdf_path)
     page = pdf_document[0]
