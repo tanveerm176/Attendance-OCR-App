@@ -3,7 +3,14 @@ from pathlib import Path
 import cv2
 import pandas as pd
 
-from ocr_pipeline import ingestion, table_detection, img_cropping, ocr, classification, reconciliation, rotate
+from ocr_pipeline import (ingestion, 
+                          table_detection, 
+                          img_cropping, 
+                          ocr, 
+                          classification, 
+                          reconciliation, 
+                          rotate,
+                          deskew)
 from ocr_pipeline.config import PipelineConfig
 from ocr_pipeline.exceptions import TableDetectionError
 import matplotlib.pyplot as plt
@@ -18,14 +25,23 @@ class OCRPipeline:
 
         # --- Stage 1: PDF Ingestion -> RGB ONLY ---
         img_rgb = ingestion.pdf_to_image(pdf_path)
-
-        # --- Stage 1.5: PDF Rotation ---
         img_gray = cv2.cvtColor(img_rgb, cv2.COLOR_RGB2GRAY)
-        osd_dict = rotate.detect_rotation(img_gray)
 
-        if osd_dict['rotate'] != 0:
-            img_gray = rotate.rotate_image(img_gray, osd_dict['rotate'])
-            img_rgb = rotate.rotate_image(img_rgb, osd_dict['rotate'])
+        # --- Stage 1.25: PDF Rotation ---
+        img_info = rotate.detect_rotation(img_gray[:,0:1000])
+        cv2.imwrite("img_gray_incorrect_rotation.png", img_gray[:,0:1000])
+
+        if img_info['rotate'] != 0:
+            img_gray = rotate.rotate_image(img_gray, img_info['rotate'])
+            cv2.imwrite("img_gray_rotated.png", img_gray)
+            img_rgb = rotate.rotate_image(img_rgb, img_info['rotate'])
+
+        # --- Stage 1.5: PDF Deskew ---
+        img_skew_angle = deskew.get_skew_angle(img_gray)
+
+        if img_skew_angle != 0.0:
+            img_gray = deskew.correct_skew(img_gray, img_skew_angle)
+            img_rgb = deskew.correct_skew(img_rgb, img_skew_angle)
 
         # --- Stage 2: Vertical Line Detection ---
         # plt.imshow(img_gray, cmap='gray')
@@ -39,7 +55,9 @@ class OCRPipeline:
             )
         
         # --- Stage 3: Crop Image Vertically to Table Region ---
-        # (line 0 -> img_crop_end)
+        if vertical_lines[0] < 50:
+            vertical_lines = vertical_lines[1:]
+
         table_x_start = vertical_lines[cfg.img_crop_start]
         table_x_end = vertical_lines[cfg.img_crop_end]
 
@@ -71,6 +89,8 @@ class OCRPipeline:
         attendance_statuses = []
 
         # Skip Header if not Main Page, splice horizontal_lines[]
+        if horizontal_lines[0] < 5:
+            horizontal_lines = horizontal_lines[1:]
         page_header = img_cropping.horizontal_img_crop(table_img_gray, 0, horizontal_lines[0])
         print(f'Page Header Height: {page_header.shape[0]}')
         # cv2.imwrite("page_header.png", page_header)
