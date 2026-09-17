@@ -3,7 +3,7 @@ import numpy as np
 from ocr_pipeline.config import DPI
 from pathlib import Path
 
-def pdf_to_image(pdf_path: Path) -> np.ndarray:
+def pdf_to_image(pdf_path: Path) -> list[np.ndarray]:
     """
     Opens a scanned PDF, renders the first page at 300 DPI,
     and returns it as an RGB numpy array.
@@ -14,25 +14,28 @@ def pdf_to_image(pdf_path: Path) -> np.ndarray:
     Returns:
         img_rgb: H x W x 3 numpy array in RGB color space
     """
+    img_rgb_list = []
     pdf_document = fitz.open(pdf_path)
-    page = pdf_document[0]
+    
+    for page in pdf_document:
 
-    # Render to pixel map - zoom = OCR resolution 300dpi
-    zoom = DPI/72 # PDF points to pixels (1 inch = 72 pts)
-    mat = fitz.Matrix(zoom, zoom)
-    pixmap = page.get_pixmap(matrix=mat)
+        # Render to pixel map - zoom = OCR resolution 300dpi
+        zoom = DPI/72 # PDF points to pixels (1 inch = 72 pts)
+        mat = fitz.Matrix(zoom, zoom)
+        pixmap = page.get_pixmap(matrix=mat)
 
-    """
-    Convert to numpy array so OpenCV & MatPlotLib can work with it
-    pdf_img.samples = 1D stream of bytes of image
-    reshaped to 2D matrix of height x width & 3 color channels
-    """
-    img_rgb = np.frombuffer(pixmap.samples, dtype=np.uint8,).reshape(
-        pixmap.height, pixmap.width, pixmap.n
-        )
+        """
+        Convert to numpy array so OpenCV & MatPlotLib can work with it
+        pdf_img.samples = 1D stream of bytes of image
+        reshaped to 2D matrix of height x width & 3 color channels
+        """
+        img_rgb = np.frombuffer(pixmap.samples, dtype=np.uint8,).reshape(
+            pixmap.height, pixmap.width, pixmap.n
+            )
+        img_rgb_list.append(img_rgb)
 
     # img_gray = cv2.cvtColor(img_rgb, cv2.COLOR_RGB2GRAY)
 
     pdf_document.close()
     
-    return img_rgb
+    return img_rgb_list
