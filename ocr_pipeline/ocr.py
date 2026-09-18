@@ -2,6 +2,7 @@ import os
 import cv2
 import numpy as np
 import pytesseract
+from ocr_pipeline.reconciliation import clean_ocr_name
 
 # pytesseract.pytesseract.tesseract_cmd = r'C:\Users\mtanveer\AppData\Local\Programs\Tesseract-OCR\tesseract.exe'
 
@@ -32,7 +33,22 @@ def preprocess_for_ocr(gray_img: np.ndarray) -> np.ndarray:
 def tesseract_ocr(image_cell_gray: np.ndarray) -> str:
     assert image_cell_gray.ndim == 2, f'Expected Grayscale Image with 2 channels, received {image_cell_gray.shape}'
     processed = preprocess_for_ocr(image_cell_gray)
-    return pytesseract.image_to_string(processed)
+    ocr_result = pytesseract.image_to_string(processed)
+
+    # print(f'OCR RESULT---->:{ocr_result}')
+
+    # if tesseract ocr fails on processed, try on just tesseract
+    if ocr_result == '':
+        only_tesseract = pytesseract.image_to_string(image_cell_gray)
+
+        # cv2.imwrite(f"reporting/OCR_failed_{clean_ocr_name(only_tesseract)}.png", 
+        #             processed)
+
+        # print(f'OCR RETRY----->:{only_tesseract}')
+
+        return only_tesseract
+
+    return ocr_result
 
 
 def detect_handwritten_names(image_cell_gray: np.ndarray) -> bool:

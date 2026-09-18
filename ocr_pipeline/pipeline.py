@@ -34,21 +34,21 @@ class OCRPipeline:
             # --- Stage 1: Convert to Grayscale ---
             img_gray = cv2.cvtColor(img_rgb, cv2.COLOR_RGB2GRAY)
 
-            # --- Stage 1.25: Detect PDF Rotation & Correct ---
-            img_info = rotate.detect_rotation(img_gray[:,0:1000])
-            cv2.imwrite("img_gray_incorrect_rotation.png", img_gray[:,0:1000])
+            # # --- Stage 1.25: Detect PDF Rotation & Correct ---
+            # img_info = rotate.detect_rotation(img_gray[:,0:1000])
+            # cv2.imwrite("img_gray_incorrect_rotation.png", img_gray[:,0:1000])
 
-            if img_info['rotate'] != 0:
-                img_gray = rotate.rotate_image(img_gray, img_info['rotate'])
-                cv2.imwrite("img_gray_rotated.png", img_gray)
-                img_rgb = rotate.rotate_image(img_rgb, img_info['rotate'])
+            # if img_info['rotate'] != 0:
+            #     img_gray = rotate.rotate_image(img_gray, img_info['rotate'])
+            #     cv2.imwrite("img_gray_rotated.png", img_gray)
+            #     img_rgb = rotate.rotate_image(img_rgb, img_info['rotate'])
 
-            # --- Stage 1.5: PDF Deskew ---
-            img_skew_angle = deskew.get_skew_angle(img_gray)
+            # # --- Stage 1.5: PDF Deskew ---
+            # img_skew_angle = deskew.get_skew_angle(img_gray)
 
-            if img_skew_angle != 0.0:
-                img_gray = deskew.correct_skew(img_gray, img_skew_angle)
-                img_rgb = deskew.correct_skew(img_rgb, img_skew_angle)
+            # if img_skew_angle != 0.0:
+            #     img_gray = deskew.correct_skew(img_gray, img_skew_angle)
+            #     img_rgb = deskew.correct_skew(img_rgb, img_skew_angle)
 
             # --- Stage 2: Vertical Line Detection ---
             vertical_lines = table_detection.get_vertical_line_positions(img_gray)
