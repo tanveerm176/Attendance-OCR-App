@@ -34,14 +34,9 @@ class OCRPipeline:
             # --- Stage 1: Convert to Grayscale ---
             img_gray = cv2.cvtColor(img_rgb, cv2.COLOR_RGB2GRAY)
 
-            # # --- Stage 1.25: Detect PDF Rotation & Correct ---
-            # img_info = rotate.detect_rotation(img_gray[:,0:1000])
-            # cv2.imwrite("img_gray_incorrect_rotation.png", img_gray[:,0:1000])
-
-            # if img_info['rotate'] != 0:
-            #     img_gray = rotate.rotate_image(img_gray, img_info['rotate'])
-            #     cv2.imwrite("img_gray_rotated.png", img_gray)
-            #     img_rgb = rotate.rotate_image(img_rgb, img_info['rotate'])
+            # --- Stage 1.25: Correct PDF Orientation ---
+            # img_gray = rotate.correct_orientation(img_gray)
+            # img_rgb = rotate.correct_orientation(img_rgb)
 
             # # --- Stage 1.5: PDF Deskew ---
             # img_skew_angle = deskew.get_skew_angle(img_gray)
@@ -89,7 +84,7 @@ class OCRPipeline:
             page_header = img_cropping.horizontal_img_crop(table_img_gray, 0, horizontal_lines[0])
             print(f'Page Header Height: {page_header.shape[0]}')
 
-            cv2.imwrite("page_header.png", page_header)
+            # cv2.imwrite("page_header.png", page_header)
             if page_header.shape[0] >= 400:
                 print(f'On Main Page, Header Skipped by {cfg.skip_header_start_row} lines')
                 horizontal_lines = horizontal_lines[cfg.skip_header_start_row:]   

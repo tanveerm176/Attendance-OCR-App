@@ -70,11 +70,11 @@ def get_horizontal_line_positions(gray_img: np.ndarray) -> list[int]:
     assert gray_img.ndim == 2, f'Expected Grayscale Image with 2 channels, received {gray_img.shape}'
 
     _, binary = cv2.threshold(gray_img, 150, 255, cv2.THRESH_BINARY_INV)
-    horizontal_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (75,1))
+    horizontal_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (105,1))
     h_lines = cv2.morphologyEx(binary, cv2.MORPH_OPEN, horizontal_kernel)
 
     row_sums = np.sum(h_lines, axis=1)
-    line_threshold = np.max(row_sums) * 0.5
+    line_threshold = np.max(row_sums) * 0.2 # change to 0.1 when image rotated
     line_rows = np.where(row_sums > line_threshold)[0]
 
     horizontal_line_positions = []
@@ -82,7 +82,7 @@ def get_horizontal_line_positions(gray_img: np.ndarray) -> list[int]:
         row_cluster = [line_rows[0]]
 
         for curr_row in line_rows[1:]:
-            if curr_row - row_cluster[-1] < 5:
+            if curr_row - row_cluster[-1] < 10:
                 row_cluster.append(curr_row)
             else:
                 horizontal_line_positions.append(int(np.mean(row_cluster)))
