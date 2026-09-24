@@ -1,6 +1,6 @@
 import re
 import pandas as pd
-from rapidfuzz import process, fuzz
+from rapidfuzz import process, fuzz, utils
 
 from ocr_pipeline.exceptions import OCRExtractionError, NoMatchFoundError
 
@@ -45,7 +45,11 @@ def fuzzy_match_names(df: pd.DataFrame, roster: list[str],
             continue
 
         # For names that pass Case 1, send to fuzzy_matcher
-        result = process.extractOne(cleaned, roster, scorer=fuzz.token_sort_ratio)
+        result = process.extractOne(cleaned, 
+                                    roster, 
+                                    scorer=fuzz.token_sort_ratio,
+                                    processor=utils.default_process,   # <-- lowercases before tokenizing/sorting
+                                )
 
         if not result:
             # extractOne can return None if roster is empty — distinct from

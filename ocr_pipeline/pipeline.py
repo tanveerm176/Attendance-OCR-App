@@ -38,12 +38,12 @@ class OCRPipeline:
             # img_gray = rotate.correct_orientation(img_gray)
             # img_rgb = rotate.correct_orientation(img_rgb)
 
-            # # --- Stage 1.5: PDF Deskew ---
-            # img_skew_angle = deskew.get_skew_angle(img_gray)
+            # --- Stage 1.5: PDF Deskew ---
+            img_skew_angle = deskew.get_skew_angle(img_gray)
 
-            # if img_skew_angle != 0.0:
-            #     img_gray = deskew.correct_skew(img_gray, img_skew_angle)
-            #     img_rgb = deskew.correct_skew(img_rgb, img_skew_angle)
+            if img_skew_angle != 0.0:
+                img_gray = deskew.correct_skew(img_gray, img_skew_angle)
+                img_rgb = deskew.correct_skew(img_rgb, img_skew_angle)
 
             # --- Stage 2: Vertical Line Detection ---
             vertical_lines = table_detection.get_vertical_line_positions(img_gray)
@@ -106,13 +106,13 @@ class OCRPipeline:
 
 
 
-            # # --------------- DEBUG IMAGE GENERATION -------------------------------
-            # debug_name_crop_raw = table_img_rgb[horizontal_lines[12]:horizontal_lines[13], name_x_start:name_x_end]
-            # debug_name_crop_raw = cv2.cvtColor(debug_name_crop_raw, cv2.COLOR_RGB2GRAY)
-            # cv2.imwrite("debug_name_crop_raw.png", debug_name_crop_raw)
+            # --------------- DEBUG IMAGE GENERATION -------------------------------
+            debug_name_crop_raw = table_img_rgb[horizontal_lines[10]:horizontal_lines[11], name_x_start+1:name_x_end]
+            debug_name_crop_raw = cv2.cvtColor(debug_name_crop_raw, cv2.COLOR_RGB2GRAY)
+            cv2.imwrite("debug_name_crop_raw.png", debug_name_crop_raw)
 
-            # debug_name_crop_binary = ocr.preprocess_for_ocr(debug_name_crop_raw)
-            # cv2.imwrite("debug_name_crop_binary.png", debug_name_crop_binary)
+            debug_name_crop_binary = ocr.preprocess_for_ocr(debug_name_crop_raw)
+            cv2.imwrite("debug_name_crop_binary.png", debug_name_crop_binary)
             # # --------------- DEBUG IMAGE GENERATION -------------------------------
 
             # # --------------- SIGNATURE IMAGE GENERATION -------------------------------
@@ -128,7 +128,7 @@ class OCRPipeline:
                 table_row_rgb = img_cropping.horizontal_img_crop(table_img_rgb, row_top_line, row_bottom_line)
                 
                 # Name sub-crop -> grayscale (tesseract_ocr requires Grayscale Img input)
-                name_crop_rgb = img_cropping.vertical_img_crop(table_row_rgb, name_x_start, name_x_end)
+                name_crop_rgb = img_cropping.vertical_img_crop(table_row_rgb, name_x_start+1, name_x_end)
                 name_crop_gray = cv2.cvtColor(name_crop_rgb, cv2.COLOR_RGB2GRAY)
                 ocr_name = ocr.tesseract_ocr(name_crop_gray)
 
