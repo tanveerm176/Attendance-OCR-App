@@ -79,7 +79,7 @@ class OCRPipeline:
             if horizontal_lines[0] < 5:
                 print('horizontal_lines[0] < 5')
                 horizontal_lines = horizontal_lines[1:]
-            print(f'After Change Horizontal Lines: {horizontal_lines}')
+                print(f'After Change Horizontal Lines: {horizontal_lines}')
 
             page_header = img_cropping.horizontal_img_crop(table_img_gray, 0, horizontal_lines[0])
             print(f'Page Header Height: {page_header.shape[0]}')
@@ -91,6 +91,14 @@ class OCRPipeline:
                 print(f'After Header Skipped {horizontal_lines}')
 
             else: print('Not on Main Page')
+
+            end_of_img = table_img_rgb.shape[0]
+            if (horizontal_lines[-1] - horizontal_lines[-2]) > 500:
+                end_of_img = horizontal_lines[-1] - 200 #ensures DYCD logo is cutout when processing written section
+                print(f'[-1]:{horizontal_lines[-1]}, [-2]:{horizontal_lines[-2]}')
+                print("DYCD Logo Detected, changed table height to disregard")
+                horizontal_lines = horizontal_lines[:-1]
+                print(f'DYCD Logo Detected Lines: {horizontal_lines}')
 
             # --- Stage 5: Iterate over Table Rows, Extract Name, Classify Attendance
             # x-coordinates rebased against table_img_rgb's shifted origin
@@ -136,7 +144,8 @@ class OCRPipeline:
                 attendance_statuses.append(attendance_status)
 
             # ---- Detect Handwritten Names at Bottom of Sheet if any ----
-            written_section = img_cropping.horizontal_img_crop(table_img_rgb, horizontal_lines[-1], table_img_rgb.shape[0])
+            written_section = img_cropping.horizontal_img_crop(table_img_rgb, horizontal_lines[-1], end_of_img)
+            # cv2.imwrite("./output/debug_written_section.png", written_section)
             written_names = img_cropping.vertical_img_crop(written_section, name_x_start, name_x_end)
             written_names_gray = cv2.cvtColor(written_names, cv2.COLOR_BGR2GRAY)
 

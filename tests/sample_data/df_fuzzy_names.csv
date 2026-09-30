@@ -18,19 +18,20 @@ Date,OCR Names,Attendance Status,cleaned_name,matched_name,matched_score,flag
 01/07/2026,Ascarivay Anya,Absent,Ascarivay Anya,"Ascaribay Anya
 ",92.86,Strong Match
 01/07/2026,Attaalla Kiros -,Absent,Attaalla Kiros -,"Attaalla Kiros
-",93.33,Strong Match
+",100.0,Strong Match
 01/07/2026,Attala WMariolina,Absent,Attala WMariolina,"Attaalla Mariolina
 ",91.43,Strong Match
 01/07/2026,Bonilla Lian,Present,Bonilla Lian,"Attaalla Mariolina
-",40.0,Low Match - Needs Review
+",46.67,Low Match - Needs Review
 01/07/2026,Calle Alicia,Present,Calle Alicia,"Alvarracin Matthew
 ",46.67,Low Match - Needs Review
-01/07/2026,Campoverde Michael,Absent,Campoverde Michael,Bermejo Mely,46.67,Low Match - Needs Review
-01/07/2026,Carrillo Liam,Absent,Carrillo Liam,"Alvarracin Matthew
-",38.71,Low Match - Needs Review
+01/07/2026,Campoverde Michael,Absent,Campoverde Michael,"Almodovar Emma
+",50.0,Low Match - Needs Review
+01/07/2026,Carrillo Liam,Absent,Carrillo Liam,"Aquino Kylah
+",48.0,Low Match - Needs Review
 01/07/2026,Cetino Dylan,Absent,Cetino Dylan,"Aquino Kylah
 ",58.33,Low Match - Needs Review
-01/07/2026,Chau Edan,Present,Chau Edan,"Araujo Pablo
+01/07/2026,Chau Edan,Present,Chau Edan,"Aquino Kylah
 ",38.1,Low Match - Needs Review
 01/07/2026,Chen Alva,Absent,Chen Alva,"Almodovar Nathan
 ",56.0,Low Match - Needs Review
@@ -38,8 +39,7 @@ Date,OCR Names,Attendance Status,cleaned_name,matched_name,matched_score,flag
 ",37.04,Low Match - Needs Review
 01/07/2026,Ciutron Tyler,Present,Ciutron Tyler,"Aquino Kylah
 ",40.0,Low Match - Needs Review
-01/07/2026,Cubero Sofia,Absent,Cubero Sofia,"Ayers Nyla
-",36.36,Low Match - Needs Review
+01/07/2026,Cubero Sofia,Absent,Cubero Sofia,Bermejo Mely,41.67,Low Match - Needs Review
 01/07/2026,Cuevas Pallo,Absent,Cuevas Pallo,"Araujo Pablo
 ",50.0,Low Match - Needs Review
 01/07/2026,De Kushum,Present,De Kushum,"Aquino Kylah

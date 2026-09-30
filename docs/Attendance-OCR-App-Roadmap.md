@@ -11,11 +11,11 @@
 **Goal:** A working, demoable pipeline: PDF in → Excel out, via CLI.
 
 ### Steps
-- [ ] Finish `classification.py` (HSV-based attendance status detection, column 5)
-- [ ] Write `pipeline.py` as a **stub/skeleton first** — lock in the data handoffs between stages before wiring in real module calls. This is the step that prevents rework later; get the shape of `OCRPipeline.run()` right before filling in logic.
-- [ ] Write `models.py` — dataclasses: `AttendanceRecord`, `ReconciliationResult`
-- [ ] Write `exceptions.py` — custom exceptions for pipeline failure modes (e.g. malformed PDF, no columns detected, no rows detected)
-- [ ] Wire `pipeline.py` to call the real modules in order:
+- [x] Finish `classification.py` (HSV-based attendance status detection, column 5)
+- [x] Write `pipeline.py` as a **stub/skeleton first** — lock in the data handoffs between stages before wiring in real module calls. This is the step that prevents rework later; get the shape of `OCRPipeline.run()` right before filling in logic.
+- [x] Write `models.py` — dataclasses: `AttendanceRecord`, `ReconciliationResult`
+- [x] Write `exceptions.py` — custom exceptions for pipeline failure modes (e.g. malformed PDF, no columns detected, no rows detected)
+- [x] Wire `pipeline.py` to call the real modules in order:
   1. PDF ingest (`fitz`, 300 DPI)
   2. Vertical morphological kernels → column detection → crop to first 5 columns
   3. Horizontal kernels → row detection
@@ -23,10 +23,10 @@
   5. `clean_ocr_name`
   6. Fuzzy match against roster (`rapidfuzz`) — **carry resolved student IDs forward, not just matched name strings**, so downstream reconciliation errors aren't conflated with fuzzy-match errors
   7. Excel export
-- [ ] CLI entrypoint: prompt for date (`MM/DD/YYYY`, validated via `pd.to_datetime`), call `OCRPipeline.run()`, write Excel
-- [ ] Confirm `OCRPipeline.run(pdf_path) -> pd.DataFrame` has **no interactive prompts inside it** — prompts belong in the CLI layer only, so the same call can later be invoked from a GUI, web route, or API without modification
-- [ ] Pass DataFrames between internal pipeline stages (not repeated Excel I/O) to avoid unnecessary disk round-trips
-- [ ] End-to-end test: real scanned PDF → correct Excel output
+- [x] CLI entrypoint: prompt for date (`MM/DD/YYYY`, validated via `pd.to_datetime`), call `OCRPipeline.run()`, write Excel
+- [x] Confirm `OCRPipeline.run(pdf_path) -> pd.DataFrame` has **no interactive prompts inside it** — prompts belong in the CLI layer only, so the same call can later be invoked from a GUI, web route, or API without modification
+- [x] Pass DataFrames between internal pipeline stages (not repeated Excel I/O) to avoid unnecessary disk round-trips
+- [x] End-to-end test: real scanned PDF → correct Excel output
 
 ### Explicitly deferred (not MVP blockers)
 - Deskew (implemented in notebook but degrades OCR accuracy; not validated end-to-end)
