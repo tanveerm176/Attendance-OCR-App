@@ -102,12 +102,8 @@ class OCRPipeline:
             attendance_x_start = vertical_lines[cfg.attendance_col_start] - table_x_start
             attendance_x_end = vertical_lines[cfg.attendance_col_end] - table_x_start
 
-
-
-
-
             # --------------- DEBUG IMAGE GENERATION -------------------------------
-            debug_name_crop_raw = table_img_rgb[horizontal_lines[10]:horizontal_lines[11], name_x_start+1:name_x_end]
+            debug_name_crop_raw = table_img_rgb[horizontal_lines[10]:horizontal_lines[11], name_x_start+1:name_x_end-10]
             debug_name_crop_raw = cv2.cvtColor(debug_name_crop_raw, cv2.COLOR_RGB2GRAY)
             cv2.imwrite("debug_name_crop_raw.png", debug_name_crop_raw)
 
@@ -128,7 +124,7 @@ class OCRPipeline:
                 table_row_rgb = img_cropping.horizontal_img_crop(table_img_rgb, row_top_line, row_bottom_line)
                 
                 # Name sub-crop -> grayscale (tesseract_ocr requires Grayscale Img input)
-                name_crop_rgb = img_cropping.vertical_img_crop(table_row_rgb, name_x_start+1, name_x_end)
+                name_crop_rgb = img_cropping.vertical_img_crop(table_row_rgb, name_x_start+1, name_x_end-10)
                 name_crop_gray = cv2.cvtColor(name_crop_rgb, cv2.COLOR_RGB2GRAY)
                 ocr_name = ocr.tesseract_ocr(name_crop_gray)
 

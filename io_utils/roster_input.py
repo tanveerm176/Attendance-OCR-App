@@ -1,7 +1,7 @@
 import re
 from pathlib import Path
 
-ROSTER_PATH = Path("data/student_roster.txt")
+ROSTER_PATH = Path("data/student_roster_26.txt")
 
 def build_roster() -> list[str]:
     student_roster: list[str] = []
