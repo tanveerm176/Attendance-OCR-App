@@ -33,13 +33,13 @@ def preprocess_for_ocr(gray_img: np.ndarray) -> np.ndarray:
 def tesseract_ocr(image_cell_gray: np.ndarray) -> str:
     assert image_cell_gray.ndim == 2, f'Expected Grayscale Image with 2 channels, received {image_cell_gray.shape}'
     processed = preprocess_for_ocr(image_cell_gray)
-    ocr_result = pytesseract.image_to_string(processed)
+    ocr_result = pytesseract.image_to_string(processed).strip()
 
     # print(f'OCR RESULT---->:{ocr_result}')
 
     # if tesseract ocr fails on processed, try on just tesseract
     if ocr_result == '':
-        only_tesseract = pytesseract.image_to_string(image_cell_gray)
+        only_tesseract = pytesseract.image_to_string(image_cell_gray).strip()
 
         # cv2.imwrite(f"reporting/OCR_failed_{clean_ocr_name(only_tesseract)}.png", 
         #             processed)

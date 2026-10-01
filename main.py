@@ -80,6 +80,8 @@ from ocr_pipeline.pipeline import OCRPipeline
 from io_utils.roster_input import build_roster
 from io_utils.excel_output import export_attendance
 
+from ocr_pipeline.models import DailySheet
+
 
 def prompt_for_pdf_path() -> Path:
     root = tk.Tk()
@@ -116,7 +118,7 @@ def build_excel_output(pdf_path: Path, sheet_date: str) -> Path:
 
 def main():
     pdf_path = prompt_for_pdf_path()
-    sheet_date = prompt_for_date()
+    # sheet_date = prompt_for_date()
 
     # Start the timer
     start_time = time.perf_counter()  
@@ -127,14 +129,13 @@ def main():
 
     df = pipeline.run(pdf_path)
 
-    # stamp date as the first column
-    df.insert(0,'Date',sheet_date)
+    
 
     pd.set_option('display.max_rows', None)
     pd.set_option('display.max_colwidth', None)
     print(df)
 
-    output_path = build_excel_output(pdf_path, sheet_date)
+    output_path = build_excel_output(pdf_path, DailySheet.sheet_date.strftime("%m/%d/%Y"))
     export_attendance(df, output_path)
 
 
