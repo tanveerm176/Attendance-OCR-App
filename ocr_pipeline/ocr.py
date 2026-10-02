@@ -30,6 +30,39 @@ def preprocess_for_ocr(gray_img: np.ndarray) -> np.ndarray:
     
     return processed
 
+
+def remove_red_strikethrough(image_rgb: np.ndarray) -> np.ndarray:
+    """Remove red marks from an RGB crop before it is converted to grayscale.
+
+    The image is converted to HSV so red can be identified across the hue
+    range's wraparound at zero. Pixels matching either red hue range are
+    combined into a mask, then OpenCV inpaints those pixels from nearby
+    content so the mark is less likely to interfere with name OCR.
+
+    If no red pixels are found, return an unchanged copy of the input.
+    """
+    if image_rgb.ndim != 3 or image_rgb.shape[2] != 3:
+        raise ValueError(
+            f"Expected an RGB image with 3 channels, received {image_rgb.shape}"
+        )
+
+    # HSV separates hue from brightness and saturation, making red ink easier
+    # to detect than with fixed RGB channel comparisons.
+    hsv = cv2.cvtColor(image_rgb, cv2.COLOR_RGB2HSV)
+
+    # Red straddles the beginning/end of OpenCV's hue range, so cover both.
+    lower_red = cv2.inRange(hsv, np.array([0, 45, 50]), np.array([10, 255, 255]))
+    upper_red = cv2.inRange(hsv, np.array([170, 45, 50]), np.array([180, 255, 255]))
+    red_mask = cv2.bitwise_or(lower_red, upper_red)
+
+    if not np.any(red_mask):
+        return image_rgb.copy()
+
+    # Replace masked pixels using nearby image content rather than white, which
+    # could erase parts of letters where the strike crosses the printed name.
+    return cv2.inpaint(image_rgb, red_mask, 3, cv2.INPAINT_TELEA)
+
+
 def tesseract_ocr(image_cell_gray: np.ndarray) -> str:
     assert image_cell_gray.ndim == 2, f'Expected Grayscale Image with 2 channels, received {image_cell_gray.shape}'
     processed = preprocess_for_ocr(image_cell_gray)

@@ -96,14 +96,6 @@ class OCRPipeline:
 
             else: print('Not on Main Page')
 
-            end_of_img = table_img_rgb.shape[0]
-            if (horizontal_lines[-1] - horizontal_lines[-2]) > 500:
-                end_of_img = horizontal_lines[-1] - 200 #ensures DYCD logo is cutout when processing written section
-                print(f'[-1]:{horizontal_lines[-1]}, [-2]:{horizontal_lines[-2]}')
-                print("DYCD Logo Detected, changed table height to disregard")
-                horizontal_lines = horizontal_lines[:-1]
-                print(f'DYCD Logo Detected Lines: {horizontal_lines}')
-
             # --- Stage 5: Iterate over Table Rows, Extract Name, Classify Attendance
             # x-coordinates rebased against table_img_rgb's shifted origin
             # (table_x_start subtracted, since vertical_lines was detected on
@@ -115,12 +107,12 @@ class OCRPipeline:
             attendance_x_end = vertical_lines[cfg.attendance_col_end] - table_x_start
 
             # --------------- DEBUG IMAGE GENERATION -------------------------------
-            # debug_name_crop_raw = table_img_rgb[horizontal_lines[10]:horizontal_lines[11], name_x_start+1:name_x_end-10]
-            # debug_name_crop_raw = cv2.cvtColor(debug_name_crop_raw, cv2.COLOR_RGB2GRAY)
-            # cv2.imwrite("debug_name_crop_raw.png", debug_name_crop_raw)
+            debug_name_crop_raw = table_img_rgb[horizontal_lines[11]:horizontal_lines[12], name_x_start+1:name_x_end-10]
+            debug_name_crop_raw = cv2.cvtColor(debug_name_crop_raw, cv2.COLOR_RGB2GRAY)
+            cv2.imwrite("./output/debug_name_crop_raw.png", debug_name_crop_raw)
 
-            # debug_name_crop_binary = ocr.preprocess_for_ocr(debug_name_crop_raw)
-            # cv2.imwrite("debug_name_crop_binary.png", debug_name_crop_binary)
+            debug_name_crop_binary = ocr.preprocess_for_ocr(debug_name_crop_raw)
+            cv2.imwrite("./output/debug_name_crop_binary.png", debug_name_crop_binary)
             # # --------------- DEBUG IMAGE GENERATION -------------------------------
 
             # # --------------- SIGNATURE IMAGE GENERATION -------------------------------
@@ -130,13 +122,19 @@ class OCRPipeline:
 
             # print(f"Name Extracted: {ocr.tesseract_ocr(debug_name_crop_raw)}")
 
-            # Iterate over all rows
-            for line_index in range(len(horizontal_lines) - 1):
-                row_top_line, row_bottom_line = horizontal_lines[line_index], horizontal_lines[line_index+1]
+            student_rows, handwritten_bounds = (
+                table_detection.split_student_rows_and_handwritten_region(
+                    horizontal_lines, table_img_rgb.shape[0]
+                )
+            )
+
+            # Process only intervals consistent with the typical student-row height.
+            for row_top_line, row_bottom_line in student_rows:
                 table_row_rgb = img_cropping.horizontal_img_crop(table_img_rgb, row_top_line, row_bottom_line)
                 
                 # Name sub-crop -> grayscale (tesseract_ocr requires Grayscale Img input)
                 name_crop_rgb = img_cropping.vertical_img_crop(table_row_rgb, name_x_start+1, name_x_end-10)
+                name_crop_rgb = ocr.remove_red_strikethrough(name_crop_rgb)
                 name_crop_gray = cv2.cvtColor(name_crop_rgb, cv2.COLOR_RGB2GRAY)
                 ocr_name = ocr.tesseract_ocr(name_crop_gray)
 
@@ -148,13 +146,22 @@ class OCRPipeline:
                 attendance_statuses.append(attendance_status)
 
             # ---- Detect Handwritten Names at Bottom of Sheet if any ----
-            written_section = img_cropping.horizontal_img_crop(table_img_rgb, horizontal_lines[-1], end_of_img)
-            # cv2.imwrite("./output/debug_written_section.png", written_section)
-            written_names = img_cropping.vertical_img_crop(written_section, name_x_start, name_x_end)
-            written_names_gray = cv2.cvtColor(written_names, cv2.COLOR_BGR2GRAY)
+            written_start, written_end = handwritten_bounds
+            written_section = img_cropping.horizontal_img_crop(
+                table_img_rgb, written_start, written_end
+            )
+            cv2.imwrite("./output/debug_written_section.png", written_section)
 
-            # cv2.imwrite("written_names_gray.png", written_names_gray)
-            written_flag = ocr.detect_handwritten_names(written_names_gray)
+            if written_section.size:
+                written_names = img_cropping.vertical_img_crop(
+                    written_section, name_x_start, name_x_end
+                )
+                written_names_gray = cv2.cvtColor(
+                    written_names, cv2.COLOR_RGB2GRAY
+                )
+                written_flag = ocr.detect_handwritten_names(written_names_gray)
+            else:
+                written_flag = False
 
             if written_flag:
                 ocr_names.append('WRITTEN NAME DETECTED')
@@ -179,4 +186,3 @@ class OCRPipeline:
         reconciled_df.insert(0,'Date', DailySheet.sheet_date)
         
         return reconciled_df
-

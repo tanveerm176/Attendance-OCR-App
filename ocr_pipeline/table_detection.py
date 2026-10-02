@@ -91,3 +91,63 @@ def get_horizontal_line_positions(gray_img: np.ndarray) -> list[int]:
         horizontal_line_positions.append(int(np.mean(row_cluster)))
 
     return horizontal_line_positions
+
+
+def split_student_rows_and_handwritten_region(
+    horizontal_lines: list[int],
+    image_height: int,
+) -> tuple[list[tuple[int, int]], tuple[int, int]]:
+    """Split detected horizontal boundaries into student rows and write-in area.
+
+    Each consecutive pair of boundaries defines a candidate row. The median
+    interval height provides a page-specific estimate of a normal student row,
+    allowing unusually short line artifacts and large footer gaps to be ignored.
+    When a large gap follows the last normal row, its first part is reserved for
+    handwriting and capped so the crop does not extend far into the footer.
+
+    If there is no such gap, reserve a typical-sized region immediately below
+    the final detected boundary instead.
+
+    Returns:
+        A list of (top, bottom) student-row bounds and (start, end) bounds for
+        the handwriting region. All bounds are vertical pixel coordinates.
+    """
+    # Measure the height of every interval between neighboring horizontal lines.
+    row_heights = np.diff(horizontal_lines)
+    if len(row_heights) == 0 or np.any(row_heights <= 0):
+        raise ValueError("Horizontal lines must contain increasing row boundaries")
+
+    # Median height is robust to a few bad detections or merged rows.
+    typical_row_height = float(np.median(row_heights))
+    # Accept normal variation, but exclude short border artifacts and merged/footer gaps.
+    min_row_height = typical_row_height * 0.5
+    max_row_height = typical_row_height * 1.5
+
+    # Keep only intervals close enough to the typical student-row height.
+    student_rows = [
+        (top, bottom)
+        for top, bottom in zip(horizontal_lines, horizontal_lines[1:])
+        if min_row_height <= bottom - top <= max_row_height
+    ]
+    if not student_rows:
+        raise ValueError("Could not identify any normal-height student rows")
+
+    last_student_bottom = student_rows[-1][1]
+    next_line_index = horizontal_lines.index(last_student_bottom) + 1
+
+    # A large gap after the final student row is the write-in/footer area.
+    if next_line_index < len(horizontal_lines):
+        next_line = horizontal_lines[next_line_index]
+        if next_line - last_student_bottom > max_row_height:
+            # Limit the crop to three row heights to avoid including a distant logo.
+            max_handwritten_height = round(typical_row_height * 3)
+            handwritten_end = min(
+                next_line, last_student_bottom + max_handwritten_height
+            )
+            return student_rows, (last_student_bottom, handwritten_end)
+
+    # Without a detected gap, inspect a bounded region just below the last line.
+    handwriting_height = round(typical_row_height * 1.5)
+    handwritten_start = horizontal_lines[-1]
+    handwritten_end = min(image_height, handwritten_start + handwriting_height)
+    return student_rows, (handwritten_start, handwritten_end)
