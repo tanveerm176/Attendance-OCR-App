@@ -47,3 +47,41 @@ def test_remove_red_strikethrough_leaves_non_red_image_unchanged():
     cleaned = remove_red_strikethrough(image_rgb)
 
     np.testing.assert_array_equal(cleaned, image_rgb)
+
+
+@pytest.mark.parametrize(
+    ("ocr_result", "expected"),
+    [
+        ("™Romero~ Jason- —.", "Romero Jason"),
+        ("Romero, Jason", "Romero, Jason"),
+    ],
+)
+def test_remove_strikethrough_artifacts(ocr_result, expected):
+    from ocr_pipeline.ocr import remove_strikethrough_artifacts
+
+    assert remove_strikethrough_artifacts(ocr_result) == expected
+
+
+def test_tesseract_ocr_removes_artifacts_from_primary_result(monkeypatch):
+    from ocr_pipeline import ocr
+
+    monkeypatch.setattr(
+        ocr.pytesseract, "image_to_string", lambda _image: "™Romero~ Jason- —."
+    )
+
+    result = ocr.tesseract_ocr(np.full((20, 80), 255, dtype=np.uint8))
+
+    assert result == "Romero Jason"
+
+
+def test_tesseract_ocr_removes_artifacts_from_fallback_result(monkeypatch):
+    from ocr_pipeline import ocr
+
+    results = iter(["", "™Romero~ Jason- —."])
+    monkeypatch.setattr(
+        ocr.pytesseract, "image_to_string", lambda _image: next(results)
+    )
+
+    result = ocr.tesseract_ocr(np.full((20, 80), 255, dtype=np.uint8))
+
+    assert result == "Romero Jason"

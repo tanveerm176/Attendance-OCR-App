@@ -63,6 +63,11 @@ def remove_red_strikethrough(image_rgb: np.ndarray) -> np.ndarray:
     return cv2.inpaint(image_rgb, red_mask, 3, cv2.INPAINT_TELEA)
 
 
+def remove_strikethrough_artifacts(ocr_result: str) -> str:
+    """Remove common OCR artifacts caused by strikethrough marks."""
+    return ocr_result.translate(str.maketrans("", "", "™~-—.")).strip()
+
+
 def tesseract_ocr(image_cell_gray: np.ndarray) -> str:
     assert image_cell_gray.ndim == 2, f'Expected Grayscale Image with 2 channels, received {image_cell_gray.shape}'
     processed = preprocess_for_ocr(image_cell_gray)
@@ -79,9 +84,9 @@ def tesseract_ocr(image_cell_gray: np.ndarray) -> str:
 
         # print(f'OCR RETRY----->:{only_tesseract}')
 
-        return only_tesseract
+        return remove_strikethrough_artifacts(only_tesseract)
 
-    return ocr_result
+    return remove_strikethrough_artifacts(ocr_result)
 
 
 def detect_handwritten_names(image_cell_gray: np.ndarray) -> bool:
