@@ -242,8 +242,9 @@ PDF File
 - **Purpose:** Export DataFrame to Excel file
 - **Main Function:** `export_attendance(df: pd.DataFrame, output_path: Path) → None`
 - **Details:**
-  - Writes DataFrame as `.xlsx` using openpyxl engine
-  - No formatting or styling applied (MVP)
+  - Groups attendance rows by date and writes one worksheet per date
+  - Names each worksheet `MM-DD-YYYY` because Excel worksheet names cannot contain `/`
+  - Formats the `Date` column as `MM/DD/YYYY`
   - Creates file at specified path, creates parent directories if needed
 - **Typical Output Columns:**
   - `ocr_name` — raw text extracted
@@ -274,24 +275,16 @@ PDF File
 
 - **Purpose:** User-facing command-line interface
 - **Current Functions:**
-  - `prompt_for_pdf_path() → Path` — file dialog to select PDF
+  - `prompt_for_pdf_folder() → Path` — file dialog to select a folder containing PDFs
+  - `process_pdf_folder(folder_path, pipeline) → pd.DataFrame` — process PDFs in filename order and concatenate results
   - `prompt_for_date() → str` — validate MM/DD/YYYY date input
-- **Workflow (Planned, per docstring):**
-  1. Check for app update (`updater.check_for_update()`)
-  2. Parse CLI arguments (input folder, roster, output path)
-  3. Validate input files exist
-  4. Load roster (`io_utils.roster_input.build_roster()`)
-  5. Prompt for batch date (MM/DD/YYYY format)
-  6. Collect PDFs from input folder
-  7. For each PDF:
-     - Initialize pipeline
-     - Call `pipeline.run(pdf_path)` → DataFrame
-     - Append to batch results
-  8. Concatenate all batch results
-  9. Export to Excel (`io_utils.excel_output.export_attendance()`)
-  10. Print summary (`reporting.summary.print_summary()`)
-  11. Write log (`reporting.logger.write_log()`)
-- **Status:** Partially implemented; docstring describes intended flow, but actual code not yet complete
+- **Workflow:**
+  1. Select a folder with the Tkinter folder dialog
+  2. Load roster (`io_utils.roster_input.build_roster()`)
+  3. Process PDF files in that folder in filename order
+  4. Concatenate the per-PDF DataFrames
+  5. Export one workbook named `<folder>_MM-DD-YYYY.xlsx` using the current date
+- **Status:** Implemented for a single selected folder; an empty folder raises an error
 
 ---
 
@@ -778,5 +771,3 @@ Defined in `ocr_pipeline/exceptions.py`:
 - [ ] Database (PostgreSQL) for historical data
 - [ ] Mobile app for remote processing
 - [ ] API for third-party integration
-
-

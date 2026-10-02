@@ -6,21 +6,21 @@ This document describes the application as implemented in the repository, using 
 
 The app is a Python PDF attendance-sheet processor. Its core `OCRPipeline` renders the pages of a selected PDF, detects table lines, extracts names with Tesseract, classifies attendance marks from their color, fuzzy-matches names against a text roster, and returns a pandas DataFrame. The entry point prints that DataFrame and attempts to export it to an Excel workbook.
 
-**Current user workflow is not yet the intended one-click experience:** `main.py` opens a file picker for one PDF. The date prompt exists but is commented out. The app does not currently select a folder or process a folder batch. The imported GitHub updater is not called. A desktop date-entry form, folder picker, progress display, and tested release/update flow remain future work.
+`main.py` opens a folder picker and processes the PDF files directly inside the selected folder in filename order. It concatenates their DataFrames into one result and writes one Excel workbook named `<folder>_MM-DD-YYYY.xlsx`, using the current date for the output filename. The date prompt exists but is not part of this workflow. The imported GitHub updater is not called; a progress display and tested release/update flow remain future work.
 
 ## Current execution path (`main.py`)
 
 When run as a Python script (or packaged executable):
 
 1. `python-dotenv` loads values from `.env` before the OCR modules are imported.
-2. `prompt_for_pdf_path()` opens a Tkinter dialog for a single PDF. Canceling raises `ValueError`.
+2. `prompt_for_pdf_folder()` opens a Tkinter dialog to select a folder. Canceling raises `ValueError`.
 3. A timer starts, and `build_roster()` reads the roster file configured in `io_utils/roster_input.py` (`data/SONYC2_roster.txt`).
-4. `PipelineConfig` is created with that roster, and `OCRPipeline.run(pdf_path)` processes the selected PDF.
-5. The resulting DataFrame is printed in full.
-6. `build_excel_output()` creates `./output` relative to the current working directory and forms an `attendance_<date>.xlsx` path. `export_attendance()` writes the DataFrame with pandas/openpyxl.
+4. `PipelineConfig` is created with that roster. `process_pdf_folder()` finds PDFs directly inside the selected folder in case-insensitive filename order, runs each through `OCRPipeline.run(pdf_path)`, and concatenates the resulting DataFrames.
+5. If the folder contains no PDFs, processing stops with a `ValueError`. Otherwise, the combined DataFrame is printed in full.
+6. `build_excel_output()` creates `./output` relative to the current working directory and forms a `<folder>_MM-DD-YYYY.xlsx` path using the current date. `export_attendance()` groups the combined DataFrame by its `Date` column and writes one worksheet per date. Worksheet names use `MM-DD-YYYY` because Excel forbids `/` in worksheet names; the `Date` cells are formatted as `MM/DD/YYYY`.
 7. The app prints a row-count/output message and elapsed time.
 
-The `prompt_for_date()` function validates `MM/DD/YYYY`, but its call is commented out. Instead, `pipeline.py` may set `DailySheet.sheet_date` by OCR when it identifies a sufficiently tall first-page header. `main.py` then uses that class attribute to name the export. The `pdf_path` parameter to `build_excel_output()` is currently unused.
+The `prompt_for_date()` function validates `MM/DD/YYYY`, but its call is not part of the current workflow. The pipeline may set `DailySheet.sheet_date` by OCR when it identifies a sufficiently tall first-page header. Sheet dates remain in the combined data, while the workbook filename uses the folder name and current processing date.
 
 ### Important current blocker
 
@@ -146,10 +146,10 @@ These items consolidate unfinished work noted across the docs and compare them w
 ### Priority 2 — Deliver the intended desktop staff workflow
 
 - [ ] Integrate the Activity Level Audit script into this project and define how it fits into the attendance-processing workflow.
-- [ ] Replace the single-PDF picker with a folder picker and collect/sort all PDFs in that folder; handle an empty folder and define file ordering.
+- [x] Replace the single-PDF picker with a folder picker and collect/sort PDFs directly in that folder; handle an empty folder.
 - [ ] Provide date entry in the UI (at minimum a validated date field) and decide whether one date applies to a batch or each sheet can have its own date.
 - [ ] Add processing feedback (selected folder/files, progress, completion, output location) and user-friendly error messages.
-- [ ] Write all processed PDFs into one combined workbook; include `source_file` per row and decide how to handle individual PDF failures.
+- [ ] Include `source_file` per row in the combined workbook and decide how to handle individual PDF failures.
 - [ ] Maintain one persistent Excel workbook and update it on each run instead of creating a new workbook each time; define how new rows are appended or existing records are updated without duplicating attendance data.
 - [ ] Show a GUI popup when handwritten names are detected, identifying the affected sheet and prompting staff to review or manually enter the name.
 - [ ] Implement `reporting.summary` and `reporting.logger` for row/match/flag counts, run metadata, errors, and output path.

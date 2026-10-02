@@ -1,10 +1,9 @@
 """CLI entry point for the attendance OCR pipeline.
 
 Responsibilities kept here, deliberately not in pipeline.py:
-- prompting for the sign-in date
-- picking the source PDF via a file dialog
-- stamping the date onto the result DataFrame
-- exporting to Excel
+- selecting a folder of PDF sign-in sheets
+- concatenating each PDF's pipeline output
+- exporting the combined results to Excel
 """
 
     # check_for_update()
@@ -71,7 +70,7 @@ import time
 import tkinter as tk
 import pandas as pd
 from updater import check_for_update
-from datetime import datetime
+from datetime import date, datetime
 from pathlib import Path
 from tkinter import filedialog
 
@@ -80,21 +79,17 @@ from ocr_pipeline.pipeline import OCRPipeline
 from io_utils.roster_input import build_roster
 from io_utils.excel_output import export_attendance
 
-from ocr_pipeline.models import DailySheet
-
-
-def prompt_for_pdf_path() -> Path:
+def prompt_for_pdf_folder() -> Path:
     root = tk.Tk()
     root.withdraw()  # hide the empty root window, only show the dialog
 
-    selected = filedialog.askopenfilename(
-        title="Select scanned sign-in sheet",
-        filetypes=[("PDF files", "*.pdf")],
-    )
-    root.destroy()
+    try:
+        selected = filedialog.askdirectory(title="Select folder of scanned sign-in sheets")
+    finally:
+        root.destroy()
 
     if not selected:
-        raise ValueError("No PDF selected — cannot continue.")
+        raise ValueError("No folder selected — cannot continue.")
 
     return Path(selected)
 
@@ -109,16 +104,37 @@ def prompt_for_date() -> str:
         except ValueError:
             print(f"'{raw}' isn't a valid MM/DD/YYYY date — try again.")
 
-def build_excel_output(pdf_path: Path, sheet_date: str) -> Path:
+def process_pdf_folder(folder_path: Path, pipeline: OCRPipeline) -> pd.DataFrame:
+    pdf_paths = sorted(
+        (
+            path
+            for path in folder_path.iterdir()
+            if path.is_file() and path.suffix.casefold() == ".pdf"
+        ),
+        key=lambda path: path.name.casefold(),
+    )
+    if not pdf_paths:
+        raise ValueError(f"No PDF files found in selected folder: {folder_path}")
+
+    dataframes = []
+    for pdf_path in pdf_paths:
+        print(f"Processing {pdf_path.name}...")
+        dataframes.append(pipeline.run(pdf_path))
+
+    return pd.concat(dataframes, ignore_index=True)
+
+
+def build_excel_output(folder_path: Path, run_date: date | None = None) -> Path:
     output_dir = Path("./output")
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    safe_date = sheet_date.replace("/","-")
-    return output_dir/f"attendance_{safe_date}.xlsx"
+    if run_date is None:
+        run_date = datetime.now().date()
+    filename = f"{folder_path.name}_{run_date.strftime('%m-%d-%Y')}.xlsx"
+    return output_dir / filename
 
 def main():
-    pdf_path = prompt_for_pdf_path()
-    # sheet_date = prompt_for_date()
+    folder_path = prompt_for_pdf_folder()
 
     # Start the timer
     start_time = time.perf_counter()  
@@ -127,15 +143,13 @@ def main():
     config = PipelineConfig(roster=roster)
     pipeline = OCRPipeline(config=config)
 
-    df = pipeline.run(pdf_path)
-
-    
+    df = process_pdf_folder(folder_path, pipeline)
 
     pd.set_option('display.max_rows', None)
     pd.set_option('display.max_colwidth', None)
     print(df)
 
-    output_path = build_excel_output(pdf_path, DailySheet.sheet_date.strftime("%m/%d/%Y"))
+    output_path = build_excel_output(folder_path)
     export_attendance(df, output_path)
 
 
