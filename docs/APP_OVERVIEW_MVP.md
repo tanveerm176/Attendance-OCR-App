@@ -245,6 +245,8 @@ PDF File
   - Groups attendance rows by date and writes one worksheet per date
   - Names each worksheet `MM-DD-YYYY` because Excel worksheet names cannot contain `/`
   - Formats the `Date` column as `MM/DD/YYYY`
+  - Sizes columns to fit content, centers cells without wrapping, styles headers distinctly, and applies thin borders to populated cells
+  - Highlights Present rows light blue, Absent rows light red, and Low Match/manual-entry rows gold
   - Creates file at specified path, creates parent directories if needed
 - **Typical Output Columns:**
   - `ocr_name` — raw text extracted

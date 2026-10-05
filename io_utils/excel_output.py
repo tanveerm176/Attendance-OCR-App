@@ -1,6 +1,8 @@
 import pandas as pd
 from pathlib import Path
 
+from io_utils.excel_formatting import format_attendance_worksheet
+
 
 def export_attendance(df: pd.DataFrame, output_path: Path) -> None:
     if "Date" not in df.columns:
@@ -33,3 +35,17 @@ def export_attendance(df: pd.DataFrame, output_path: Path) -> None:
                 max_row=worksheet.max_row,
             ):
                 row[0].number_format = "MM/DD/YYYY"
+            format_attendance_worksheet(worksheet)
+
+        worksheets = list(writer.sheets.values())
+        column_count = max(worksheet.max_column for worksheet in worksheets)
+        for column_index in range(1, column_count + 1):
+            column_letter = worksheets[0].cell(
+                row=1, column=column_index
+            ).column_letter
+            shared_width = max(
+                worksheet.column_dimensions[column_letter].width
+                for worksheet in worksheets
+            )
+            for worksheet in worksheets:
+                worksheet.column_dimensions[column_letter].width = shared_width
