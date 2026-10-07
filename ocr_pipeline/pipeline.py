@@ -107,17 +107,17 @@ class OCRPipeline:
             attendance_x_end = vertical_lines[cfg.attendance_col_end] - table_x_start
 
             # --------------- DEBUG IMAGE GENERATION -------------------------------
-            debug_name_crop_raw = table_img_rgb[horizontal_lines[11]:horizontal_lines[12], name_x_start+1:name_x_end-10]
-            debug_name_crop_raw = cv2.cvtColor(debug_name_crop_raw, cv2.COLOR_RGB2GRAY)
-            cv2.imwrite("./output/debug_name_crop_raw.png", debug_name_crop_raw)
+            # debug_name_crop_raw = table_img_rgb[horizontal_lines[3]:horizontal_lines[4], name_x_start+2:name_x_end-10]
+            # debug_name_crop_raw = cv2.cvtColor(debug_name_crop_raw, cv2.COLOR_RGB2GRAY)
+            # cv2.imwrite("./output/debug_images/debug_name_crop_raw.png", debug_name_crop_raw)
 
-            debug_name_crop_binary = ocr.preprocess_for_ocr(debug_name_crop_raw)
-            cv2.imwrite("./output/debug_name_crop_binary.png", debug_name_crop_binary)
+            # debug_name_crop_binary = ocr.preprocess_for_ocr(debug_name_crop_raw)
+            # cv2.imwrite("./output/debug_images/debug_name_crop_binary.png", debug_name_crop_binary)
             # # --------------- DEBUG IMAGE GENERATION -------------------------------
 
             # # --------------- SIGNATURE IMAGE GENERATION -------------------------------
             # debug_signature_crop = table_img_rgb[horizontal_lines[12]:horizontal_lines[13], attendance_x_start:attendance_x_end]
-            # cv2.imwrite("debug_signature_crop.png", cv2.cvtColor(debug_signature_crop, cv2.COLOR_BGR2RGB))
+            # cv2.imwrite("./output/debug_images/debug_signature_crop.png", cv2.cvtColor(debug_signature_crop, cv2.COLOR_BGR2RGB))
             # # --------------- SIGNATURE IMAGE GENERATION -------------------------------
 
             # print(f"Name Extracted: {ocr.tesseract_ocr(debug_name_crop_raw)}")
@@ -150,7 +150,7 @@ class OCRPipeline:
             written_section = img_cropping.horizontal_img_crop(
                 table_img_rgb, written_start, written_end
             )
-            cv2.imwrite("./output/debug_written_section.png", written_section)
+            cv2.imwrite("./output/debug_images/debug_written_section.png", written_section)
 
             if written_section.size:
                 written_names = img_cropping.vertical_img_crop(

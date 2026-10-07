@@ -4,13 +4,30 @@ from pathlib import Path
 from io_utils.excel_formatting import format_attendance_worksheet
 
 
+OUTPUT_COLUMNS = {
+    "Date": "Date",
+    "ocr_raw": "OCR Raw",
+    "attendance": "Attendance Status",
+    "cleaned_name": "OCR Cleaned",
+    "matched_name": "Matched Name",
+    "matched_score": "Matched Score",
+    "flag": "Flag",
+}
+
+
 def export_attendance(df: pd.DataFrame, output_path: Path) -> None:
     if "Date" not in df.columns:
         raise ValueError("Attendance data must contain a 'Date' column")
     if df.empty:
         raise ValueError("Cannot export an empty attendance DataFrame")
 
-    attendance = df.copy()
+    missing_columns = set(OUTPUT_COLUMNS).difference(df.columns)
+    if missing_columns:
+        raise ValueError(
+            f"Attendance data is missing required columns: {sorted(missing_columns)}"
+        )
+
+    attendance = df[list(OUTPUT_COLUMNS)].rename(columns=OUTPUT_COLUMNS).copy()
     attendance["Date"] = pd.to_datetime(attendance["Date"], errors="raise").dt.normalize()
     if attendance["Date"].isna().any():
         raise ValueError("Attendance data contains rows without a date")

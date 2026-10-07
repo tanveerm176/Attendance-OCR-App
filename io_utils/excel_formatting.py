@@ -22,12 +22,12 @@ def format_attendance_worksheet(worksheet: Worksheet) -> None:
         (
             cell.column
             for cell in worksheet[1]
-            if cell.value == "attendance"
+            if cell.value == "Attendance Status"
         ),
         None,
     )
     flag_column = next(
-        (cell.column for cell in worksheet[1] if cell.value == "flag"),
+        (cell.column for cell in worksheet[1] if cell.value == "Flag"),
         None,
     )
 

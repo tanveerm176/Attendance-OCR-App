@@ -18,8 +18,11 @@ def test_export_attendance_creates_date_sheets_and_formats_date_column(tmp_path)
                 datetime(2026, 10, 2, 15, 30),
                 datetime(2026, 10, 2),
             ],
-            "Student": ["A", "B", "An exceptionally long student name", "Write-in\nname"],
+            "ocr_raw": ["A", "B", "An exceptionally long OCR name", "Write-in\nname"],
             "attendance": ["Present", "Absent", "Present", "Present"],
+            "cleaned_name": ["A", "B", "An exceptionally long cleaned name", "Write-in name"],
+            "matched_name": ["Student A", "Student B", "Student C", "Student D"],
+            "matched_score": [100.0, 100.0, 82.5, 0.0],
             "flag": [
                 "Strong Match",
                 "Strong Match",
@@ -34,8 +37,24 @@ def test_export_attendance_creates_date_sheets_and_formats_date_column(tmp_path)
     workbook = load_workbook(output_path, data_only=False)
     assert workbook.sheetnames == ["09-15-2026", "10-02-2026"]
     assert list(workbook["09-15-2026"].values) == [
-        ("Date", "Student", "attendance", "flag"),
-        (datetime(2026, 9, 15), "B", "Absent", "Strong Match"),
+        (
+            "Date",
+            "OCR Raw",
+            "Attendance Status",
+            "OCR Cleaned",
+            "Matched Name",
+            "Matched Score",
+            "Flag",
+        ),
+        (
+            datetime(2026, 9, 15),
+            "B",
+            "Absent",
+            "B",
+            "Student B",
+            100.0,
+            "Strong Match",
+        ),
     ]
     assert workbook["09-15-2026"]["A2"].number_format == "MM/DD/YYYY"
     assert workbook["10-02-2026"]["A2"].number_format == "MM/DD/YYYY"
@@ -52,12 +71,12 @@ def test_export_attendance_creates_date_sheets_and_formats_date_column(tmp_path)
     assert workbook["10-02-2026"]["A3"].fill.fgColor.rgb == "00FFC000"
     assert workbook["10-02-2026"]["A4"].fill.fgColor.rgb == "00FFC000"
     assert workbook["09-15-2026"]["A2"].fill.fgColor.rgb == "00DA9694"
-    assert worksheet.column_dimensions["B"].width >= len("Student") + 2
+    assert worksheet.column_dimensions["B"].width >= len("OCR Raw") + 2
     assert worksheet.column_dimensions["B"].width == workbook[
         "09-15-2026"
     ].column_dimensions["B"].width
     assert worksheet.column_dimensions["B"].width >= len(
-        "An exceptionally long student name"
+        "An exceptionally long OCR name"
     ) + 2
     assert worksheet["B4"].alignment.wrap_text is not True
     assert worksheet.row_dimensions[4].height is None
@@ -68,7 +87,18 @@ def test_export_attendance_creates_date_sheets_and_formats_date_column(tmp_path)
     [
         (pd.DataFrame({"Student": ["A"]}), "must contain a 'Date' column"),
         (pd.DataFrame({"Date": [datetime(2026, 10, 2)], "Student": ["A"]}).iloc[0:0], "empty"),
-        (pd.DataFrame({"Date": [None], "Student": ["A"]}), "without a date"),
+        (
+            pd.DataFrame({
+                "Date": [None],
+                "ocr_raw": ["A"],
+                "attendance": ["Present"],
+                "cleaned_name": ["A"],
+                "matched_name": ["Student A"],
+                "matched_score": [100],
+                "flag": ["Strong Match"],
+            }),
+            "without a date",
+        ),
     ],
 )
 def test_export_attendance_rejects_invalid_data(tmp_path, dataframe, message):
