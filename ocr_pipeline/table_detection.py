@@ -29,7 +29,7 @@ def get_vertical_line_positions(gray_img: np.ndarray) -> list[int]:
     col_sums = np.sum(v_lines, axis=0) # axis=0 -> cols instead of axis=1
 
     # Find rows with significant white pixels (actual lines)
-    line_threshold = np.max(col_sums) * 0.3 
+    line_threshold = np.max(col_sums) * 0.1 
     line_cols = np.where(col_sums > line_threshold)[0]
 
     # --- Stage 3: Cluster nearby columns together ---

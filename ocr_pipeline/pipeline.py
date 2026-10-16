@@ -150,7 +150,7 @@ class OCRPipeline:
             written_section = img_cropping.horizontal_img_crop(
                 table_img_rgb, written_start, written_end
             )
-            cv2.imwrite("./output/debug_images/debug_written_section.png", written_section)
+            # cv2.imwrite("./output/debug_images/debug_written_section.png", written_section)
 
             if written_section.size:
                 written_names = img_cropping.vertical_img_crop(
