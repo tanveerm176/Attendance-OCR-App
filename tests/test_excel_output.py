@@ -29,6 +29,7 @@ def test_export_attendance_creates_date_sheets_and_formats_date_column(tmp_path)
                 "Low Match - Needs Review",
                 "NEED-MANUAL-ENTRY",
             ],
+            "_review_crop": [None, None, None, None],
         }
     )
 

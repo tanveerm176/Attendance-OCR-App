@@ -69,6 +69,7 @@ load_dotenv()  # populates os.environ from .env, before anything else runs
 import time
 import tkinter as tk
 import pandas as pd
+from collections.abc import Callable
 from updater import check_for_update
 from datetime import date, datetime
 from pathlib import Path
@@ -78,6 +79,7 @@ from ocr_pipeline.config import PipelineConfig
 from ocr_pipeline.pipeline import OCRPipeline
 from io_utils.roster_input import build_roster
 from io_utils.excel_output import export_attendance
+from ocr_pipeline.manual_review import REVIEW_CROP_COLUMN, review_flagged_records
 
 def prompt_for_pdf_folder() -> Path:
     root = tk.Tk()
@@ -104,7 +106,12 @@ def prompt_for_date() -> str:
         except ValueError:
             print(f"'{raw}' isn't a valid MM/DD/YYYY date — try again.")
 
-def process_pdf_folder(folder_path: Path, pipeline: OCRPipeline) -> pd.DataFrame:
+
+def process_pdf_folder(
+    folder_path: Path,
+    pipeline: OCRPipeline,
+    review_callback: Callable[[pd.DataFrame], pd.DataFrame] | None = None,
+) -> pd.DataFrame:
     pdf_paths = sorted(
         (
             path
@@ -119,7 +126,21 @@ def process_pdf_folder(folder_path: Path, pipeline: OCRPipeline) -> pd.DataFrame
     dataframes = []
     for pdf_path in pdf_paths:
         print(f"Processing {pdf_path.name}...")
-        dataframes.append(pipeline.run(pdf_path))
+        dataframe = pipeline.run(pdf_path)
+
+        # Review this PDF before moving on: the pipeline attaches each name crop
+        # to its row, and the callback displays flagged rows for roster selection.
+
+        if review_callback is not None:
+            dataframe = review_callback(dataframe)
+
+        # Crops are only needed by the review UI; keep image arrays out of the
+        # combined results and Excel export.
+
+        if REVIEW_CROP_COLUMN in dataframe.columns:
+            dataframe = dataframe.drop(columns=[REVIEW_CROP_COLUMN])
+
+        dataframes.append(dataframe)
 
     return pd.concat(dataframes, ignore_index=True)
 
@@ -143,7 +164,12 @@ def main():
     config = PipelineConfig(roster=roster)
     pipeline = OCRPipeline(config=config)
 
-    df = process_pdf_folder(folder_path, pipeline)
+    df = process_pdf_folder(
+        folder_path,
+        pipeline,
+        # Reconcile flagged names against the roster in the visual review UI.
+        review_callback=lambda dataframe: review_flagged_records(dataframe, roster)
+    )
 
     pd.set_option('display.max_rows', None)
     pd.set_option('display.max_colwidth', None)

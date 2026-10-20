@@ -30,6 +30,7 @@ class OCRPipeline:
 
         ocr_names = []
         attendance_statuses = []
+        review_crops = []
 
         for img_rgb in image_list:
 
@@ -134,6 +135,7 @@ class OCRPipeline:
                 
                 # Name sub-crop -> grayscale (tesseract_ocr requires Grayscale Img input)
                 name_crop_rgb = img_cropping.vertical_img_crop(table_row_rgb, name_x_start+1, name_x_end-10)
+                review_crops.append(name_crop_rgb.copy())
                 name_crop_rgb = ocr.remove_red_strikethrough(name_crop_rgb)
                 name_crop_gray = cv2.cvtColor(name_crop_rgb, cv2.COLOR_RGB2GRAY)
                 ocr_name = ocr.tesseract_ocr(name_crop_gray)
@@ -156,6 +158,7 @@ class OCRPipeline:
                 written_names = img_cropping.vertical_img_crop(
                     written_section, name_x_start, name_x_end
                 )
+                written_review_crop = written_names.copy()
                 written_names_gray = cv2.cvtColor(
                     written_names, cv2.COLOR_RGB2GRAY
                 )
@@ -166,21 +169,30 @@ class OCRPipeline:
             if written_flag:
                 ocr_names.append('WRITTEN NAME DETECTED')
                 attendance_statuses.append('Present')
+                review_crops.append(written_review_crop)
 
             print('Processed one sheet\n')
                 
         # --- Stage 6: Assemble Raw Dataframe ---
-        attendance_df = pd.DataFrame({'ocr_raw': ocr_names, 'attendance': attendance_statuses})
+        attendance_df = pd.DataFrame({
+            'ocr_raw': ocr_names,
+            'attendance': attendance_statuses,
+            '_review_crop': review_crops,
+        })
 
         # if written_flag:
         #     manual_entry = pd.DataFrame([{'ocr_raw': 'WRITTEN NAME DETECTED', 'attendance': 'Present'}])
         #     attendance_df = pd.concat([attendance_df, manual_entry], ignore_index=True)
 
         # --- Stage 7: Reconciliation (clean + fuzzy_match + flag)
-        reconciled_df = reconciliation.fuzzy_match_names(attendance_df, 
-                                                         cfg.roster,
-                                                         threshold = cfg.fuzzy_match_threshold,
-                                                         low_match_floor = cfg.low_match_floor)
+        print(f"Reconciling {len(attendance_df)} extracted records against the roster...")
+        reconciled_df = reconciliation.fuzzy_match_names(
+            attendance_df,
+            cfg.roster,
+            threshold=cfg.fuzzy_match_threshold,
+            low_match_floor=cfg.low_match_floor,
+        )
+        print("Name reconciliation finished.")
 
         # stamp date as the first column
         reconciled_df.insert(0,'Date', DailySheet.sheet_date)

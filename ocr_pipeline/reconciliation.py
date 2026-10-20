@@ -8,6 +8,7 @@ LOW_MATCH_SCORE_FLOOR = 30 # any match_score below this is treated as noise not 
                            #    genuine match with a low confidence score
 LOW_MATCH_LABEL = 'Low Match - Needs Review'                           
 STRONG_MATCH_LABEL = 'Strong Match'
+EMPTY_ROW_LABEL = 'EMPTY CELL'
 
 def clean_ocr_name(name: str) -> str:
     cleaned_name = re.sub(r'[^a-zA-Z\s\-\']', '', name).strip()
@@ -23,7 +24,7 @@ def fuzzy_match_names(df: pd.DataFrame, roster: list[str],
     matched_scores = []
     flags = []
 
-    for raw_name in df[name_col]:
+    for row_position, raw_name in enumerate(df[name_col].tolist()):
         cleaned = clean_ocr_name(raw_name)
         cleaned_names.append(cleaned)
 
@@ -41,7 +42,16 @@ def fuzzy_match_names(df: pd.DataFrame, roster: list[str],
         if not cleaned or len(cleaned) < 2:
             matched_names.append(None)
             matched_scores.append(0)
-            flags.append(OCRExtractionError.__name__)
+            is_empty_attendance_row = (
+                not cleaned
+                and "attendance" in df.columns
+                and df.iloc[row_position]["attendance"] == EMPTY_ROW_LABEL
+            )
+            flags.append(
+                EMPTY_ROW_LABEL
+                if is_empty_attendance_row
+                else OCRExtractionError.__name__
+            )
             continue
 
         # For names that pass Case 1, send to fuzzy_matcher

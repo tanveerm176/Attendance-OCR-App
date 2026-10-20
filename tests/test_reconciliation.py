@@ -21,3 +21,16 @@ def test_fuzzy_match_names():
     student_roster_list = build_roster()
     df_fuzzy_names = fuzzy_match_names(SAMPLE_DF, student_roster_list, name_col='OCR Names')
     df_fuzzy_names.to_csv("tests/sample_data/df_fuzzy_names.csv", index=False)
+
+
+def test_blank_name_in_empty_attendance_cell_is_not_flagged_for_manual_review():
+    dataframe = pd.DataFrame(
+        {
+            "ocr_raw": ["", ""],
+            "attendance": ["EMPTY CELL", "Present"],
+        }
+    )
+
+    result = fuzzy_match_names(dataframe, ["Student A"])
+
+    assert result["flag"].tolist() == ["EMPTY CELL", "OCRExtractionError"]
