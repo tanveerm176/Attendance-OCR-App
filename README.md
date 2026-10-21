@@ -55,6 +55,42 @@ python main.py
 
 When prompted, choose the folder containing the PDFs. The app processes PDF files in case-insensitive filename order. For each PDF, it runs OCR and reconciliation, then opens the visual review window if records need review. Review is per PDF, before the app moves on to the next PDF.
 
+### Headless batch processing
+
+For Docker or other headless environments, run the batch entry point instead of `main.py`. It processes PDFs without opening Tkinter and leaves uncertain names flagged for correction in Excel:
+
+```powershell
+attendance-ocr-batch `
+  --input-dir .\attendance-scans `
+  --output .\output\attendance.xlsx
+```
+
+The bundled roster is used by default. Pass `--roster .\data\student_roster_26.txt` to use a different roster. Each date worksheet ends with a `Source PDF Path` column containing a clickable PDF filename; the hyperlink cell is merged across rows from the same source PDF. When running in Docker, `--source-path-root` can point the hyperlink at the corresponding host-side input directory, for example `--source-path-root "C:\Attendance\Input"`.
+
+### Build and run with Docker
+
+GitHub Actions builds and smoke-tests the Docker image on pushes to `main` or `feature/headless-cli`, pull requests targeting `main`, and manual workflow runs. The workflow does not publish the image.
+
+To run it locally on a machine with Docker installed, build the image from the repository root:
+
+```sh
+docker build -t attendance-ocr:local .
+```
+
+Mount the PDFs, roster, and output directory when starting the container. Roster and attendance files are intentionally excluded from the image:
+
+```sh
+docker run --rm \
+  --mount type=bind,source=/path/to/pdfs,target=/data/input,readonly \
+  --mount type=bind,source=/path/to/roster.txt,target=/data/roster.txt,readonly \
+  --mount type=bind,source=/path/to/output,target=/data/output \
+  attendance-ocr:local \
+  --input-dir /data/input \
+  --output /data/output/attendance.xlsx \
+  --roster /data/roster.txt \
+  --source-path-root /path/to/pdfs
+```
+
 In the review window:
 
 - Inspect the displayed name crop, OCR text, current flag, and match score.
