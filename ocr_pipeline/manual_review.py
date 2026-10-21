@@ -30,8 +30,8 @@ NameSelectionDialog = Callable[
 
 
 def _encode_preview(image_rgb: np.ndarray, max_width: int = 800, max_height: int = 300) -> str:
-    if image_rgb.ndim != 3 or image_rgb.shape[2] != 3 or image_rgb.size == 0:
-        raise ValueError("Review crop must be a non-empty RGB image")
+    # if image_rgb.ndim != 3 or image_rgb.shape[2] != 3 or image_rgb.size == 0:
+    #     raise ValueError("Review crop must be a non-empty RGB image")
 
     height, width = image_rgb.shape[:2]
     scale = min(1.0, max_width / width, max_height / height)

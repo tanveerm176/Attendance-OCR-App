@@ -135,9 +135,9 @@ class OCRPipeline:
                 
                 # Name sub-crop -> grayscale (tesseract_ocr requires Grayscale Img input)
                 name_crop_rgb = img_cropping.vertical_img_crop(table_row_rgb, name_x_start+1, name_x_end-10)
-                review_crops.append(name_crop_rgb.copy())
                 name_crop_rgb = ocr.remove_red_strikethrough(name_crop_rgb)
                 name_crop_gray = cv2.cvtColor(name_crop_rgb, cv2.COLOR_RGB2GRAY)
+                review_crops.append(name_crop_gray.copy())
                 ocr_name = ocr.tesseract_ocr(name_crop_gray)
 
                 # Attendance sub-crop -> stays RGB for color classification
