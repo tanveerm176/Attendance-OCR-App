@@ -1,0 +1,28 @@
+name: Docker
+
+on:
+  push:
+    branches: [main, feature/headless-cli]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-smoke-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Build container image
+        run: docker build --tag attendance-ocr:ci .
+
+      - name: Check batch CLI starts
+        run: docker run --rm attendance-ocr:ci --help
+
+      - name: Check Tesseract is installed
+        run: docker run --rm --entrypoint tesseract attendance-ocr:ci --version
