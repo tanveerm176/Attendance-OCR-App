@@ -48,7 +48,6 @@ jobs:
         run: |
           pyinstaller --onefile `
             --add-data "VERSION;." `
-            --add-data "tessdata;tessdata"`
             main.py
         
       - name: Create GitHub Release
