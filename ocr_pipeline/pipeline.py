@@ -192,6 +192,9 @@ class OCRPipeline:
             threshold=cfg.fuzzy_match_threshold,
             low_match_floor=cfg.low_match_floor,
         )
+        crops = attendance_df["_review_crop"].dropna()
+        print(f"Crop pixel data: {sum(crop.nbytes for crop in crops) / 1024:.1f} KiB")
+        print("Crop shapes:", [crop.shape for crop in crops])
         print("Name reconciliation finished.")
 
         # stamp date as the first column
