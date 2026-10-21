@@ -12,6 +12,8 @@ dependencies = [
     "opencv-python",
     "pytesseract",
     "PyMuPDF",
+    "imutils",
+    "matplotlib",
     "rapidfuzz",
     "openpyxl",
     "python-dotenv",
