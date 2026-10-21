@@ -5,14 +5,14 @@ from pathlib import Path
 
 def pdf_to_image(pdf_path: Path) -> list[np.ndarray]:
     """
-    Opens a scanned PDF, renders the first page at 300 DPI,
-    and returns it as an RGB numpy array.
+    Render every scanned PDF page at the configured DPI as an RGB array.
 
     Args:
         pdf_path: path to the scanned PDF file
 
     Returns:
-        img_rgb: H x W x 3 numpy array in RGB color space
+        A list of H x W x 3 uint8 NumPy arrays in RGB color space,
+        with one array per PDF page.
     """
     img_rgb_list = []
     pdf_document = fitz.open(pdf_path)

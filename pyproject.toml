@@ -15,6 +15,7 @@ dependencies = [
     "rapidfuzz",
     "openpyxl",
     "python-dotenv",
+    "requests",
 ]
 
 [project.optional-dependencies]

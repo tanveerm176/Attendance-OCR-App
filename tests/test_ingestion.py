@@ -1,39 +1,28 @@
+import fitz
 import numpy as np
 import pytest
 from pathlib import Path
 from ocr_pipeline.ingestion import pdf_to_image
 
-SAMPLE_PDF = Path("tests/sample_data/sonyc-test.pdf")
 
-"Test the PDF loaded is returned as a np array"
-def test_load_pdf_returns_numpy_array():
-    img = pdf_to_image(SAMPLE_PDF)
-    assert isinstance(img, np.ndarray)
+def test_load_pdf_returns_rgb_numpy_arrays_for_each_page(tmp_path):
+    pdf_path = tmp_path / "one-page.pdf"
+    document = fitz.open()
+    page = document.new_page(width=72, height=72)
+    page.draw_rect(fitz.Rect(10, 10, 62, 62), color=(0, 0, 0), width=1)
+    document.save(pdf_path)
+    document.close()
 
-# "Test the PDF loaded has 3 dimensiins (Height, Width, Color Channels)"
-# def test_load_pdf_correct_dimensions():
-#     img = pdf_to_image(SAMPLE_PDF)
-#     # RGB image must be 3 dimensional — height, width, channels
-#     assert img.ndim == 3
+    images = pdf_to_image(pdf_path)
 
-# "Test the PDF loaded has 3 channels (RGB)"
-# def test_load_pdf_correct_channels():
-#     img = pdf_to_image(SAMPLE_PDF)
-#     # Must be 3 channel RGB
-#     assert img.shape[2] == 3
+    assert isinstance(images, list)
+    assert len(images) == 1
+    assert all(isinstance(image, np.ndarray) for image in images)
+    assert all(image.ndim == 3 and image.shape[2] == 3 for image in images)
+    assert all(image.dtype == np.uint8 for image in images)
+    assert all(image.shape[0] > 0 and image.shape[1] > 0 for image in images)
 
-# "Test the loaded PDF has the correct data type"
-# def test_load_pdf_correct_dtype():
-#     img = pdf_to_image(SAMPLE_PDF)
-#     assert img.dtype == np.uint8
 
-# "Test the PDF loaded has Height & Width > 0"
-# def test_load_pdf_nonzero_dimensions():
-#     img = pdf_to_image(SAMPLE_PDF)
-#     height, width, _ = img.shape
-#     assert height > 0 and width > 0
-
-"Test that an Exception will be raised with an invalid PDF Path"
 def test_load_pdf_invalid_path_raises():
     with pytest.raises(Exception):
-        pdf_to_image(Path("./nonexistent.pdf"))
+        pdf_to_image(Path(__file__).parent / "nonexistent.pdf")
