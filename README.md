@@ -55,6 +55,18 @@ python main.py
 
 When prompted, choose the folder containing the PDFs. The app processes PDF files in case-insensitive filename order. For each PDF, it runs OCR and reconciliation, then opens the visual review window if records need review. Review is per PDF, before the app moves on to the next PDF.
 
+### Headless batch processing
+
+For Docker or other headless environments, run the batch entry point instead of `main.py`. It processes PDFs without opening Tkinter and leaves uncertain names flagged for correction in Excel:
+
+```powershell
+attendance-ocr-batch `
+  --input-dir .\attendance-scans `
+  --output .\output\attendance.xlsx
+```
+
+The bundled roster is used by default. Pass `--roster .\data\student_roster_26.txt` to use a different roster. Each date worksheet ends with a `Source PDF Path` column containing a clickable PDF filename; the hyperlink cell is merged across rows from the same source PDF. When running in Docker, `--source-path-root` can point the hyperlink at the corresponding host-side input directory, for example `--source-path-root "C:\Attendance\Input"`.
+
 In the review window:
 
 - Inspect the displayed name crop, OCR text, current flag, and match score.

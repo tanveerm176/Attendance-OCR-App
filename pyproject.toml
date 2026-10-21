@@ -25,6 +25,9 @@ dev = [
     "pytest",
 ]
 
+[project.scripts]
+attendance-ocr-batch = "ocr_pipeline.batch_cli:main"
+
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["ocr_pipeline*", "io_utils*"]
