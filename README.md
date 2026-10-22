@@ -67,6 +67,8 @@ attendance-ocr-batch `
 
 The bundled roster is used by default. Pass `--roster .\data\student_roster_26.txt` to use a different roster. Each date worksheet ends with a `Source PDF Path` column containing a clickable PDF filename; the hyperlink cell is merged across rows from the same source PDF. When running in Docker, `--source-path-root` can point the hyperlink at the corresponding host-side input directory, for example `--source-path-root "C:\Attendance\Input"`.
 
+**Note: The headless CLI is temporary and to be replaced by a local web application in a future planned update**
+
 ### Build and run with Docker
 
 GitHub Actions builds and smoke-tests the Docker image on pushes to `main` or `feature/headless-cli`, pull requests targeting `main`, and manual workflow runs. The workflow does not publish the image.
