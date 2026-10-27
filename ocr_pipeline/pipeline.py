@@ -16,23 +16,24 @@ from ocr_pipeline.config import PipelineConfig
 from ocr_pipeline.exceptions import TableDetectionError
 import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
-from ocr_pipeline.models import DailySheet
+from ocr_pipeline.models import DailyAttendance
 
 class OCRPipeline:
     def __init__(self, config: PipelineConfig):
         self.config = config
 
     def run(self, pdf_path: Path) -> pd.DataFrame:
+        daily_attendance = DailyAttendance()
         cfg = self.config
 
         # --- Stage 0: PDF Ingestion -> list[RGB Images] ---
-        image_list = ingestion.pdf_to_image(pdf_path)
+        DailyAttendance.rgb_images = ingestion.pdf_to_image(pdf_path)
 
         ocr_names = []
         attendance_statuses = []
         review_crops = []
 
-        for img_rgb in image_list:
+        for img_rgb in DailyAttendance.rgb_images:
 
             # --- Stage 1: Convert to Grayscale ---
             img_gray = cv2.cvtColor(img_rgb, cv2.COLOR_RGB2GRAY)
@@ -89,8 +90,8 @@ class OCRPipeline:
 
             # cv2.imwrite("page_header.png", page_header)
             if page_header.shape[0] >= 400:
-                DailySheet.sheet_date = detect_date.detect_sheet_date(table_img_gray, horizontal_lines, vertical_lines)
-                print(f'{DailySheet.sheet_date}')
+                DailyAttendance.sheet_date = detect_date.detect_sheet_date(table_img_gray, horizontal_lines, vertical_lines)
+                print(f'{DailyAttendance.sheet_date}')
                 print(f'On Main Page, Header Skipped by {cfg.skip_header_start_row} lines')
                 horizontal_lines = horizontal_lines[cfg.skip_header_start_row:]   
                 print(f'After Header Skipped {horizontal_lines}')
@@ -198,6 +199,6 @@ class OCRPipeline:
         print("Name reconciliation finished.")
 
         # stamp date as the first column
-        reconciled_df.insert(0,'Date', DailySheet.sheet_date)
+        reconciled_df.insert(0,'Date', DailyAttendance.sheet_date)
         
         return reconciled_df

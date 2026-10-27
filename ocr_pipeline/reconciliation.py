@@ -99,3 +99,6 @@ def fuzzy_match_names(df: pd.DataFrame, roster: list[str],
 
 # KEEP IN MIND: NEED TO REFACTOR FUZZYMATCH 
 # SO IT TAKES A SINGLE ROW INSTEAD OF THE ENTIRE DATAFRAME
+
+def match_name(ocr_name:str, roster: list[str], 
+               threshold: int = 80, low_match_floor: int = 30) -> : 
