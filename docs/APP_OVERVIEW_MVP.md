@@ -757,7 +757,6 @@ Defined in `ocr_pipeline/exceptions.py`:
 - [ ] ISEP system alignment where ever possible (Docker)
 - [ ] PostgreSQL for multi db reconciliation 
 - [ ] Find a way to integrate Apache Airflow if possible
-- [ ] TrOCR for signature matching
 
 ### Medium Term (Phase 2)
 
