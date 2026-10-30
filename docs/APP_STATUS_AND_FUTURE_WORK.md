@@ -148,13 +148,15 @@ These items consolidate unfinished work noted across the docs and compare them w
 
 ### Priority 1 — Make date and batch processing reliable
 
+- [ ] Create two outputs, one Excel workbook with dates into separate sheets (easy for manual review) the second all dates concatenated to mimic the output from audit Stage 1
+
 - [ ] Implement multi core processing  
 - [ ] Restore a validated date prompt as the reliable fallback; pass the date explicitly instead of relying on mutable `DailySheet.sheet_date` class state.
 - [ ] Define a clear date policy: use the detected date when OCR succeeds, and provide a manual-entry fallback when date detection fails. Add tests for invalid/missing date and multi-page PDFs.
 - [ ] Decide whether output should be relative to the executable/project or user-selected; wire `OUTPUT_DIR` or remove/document it. Current output path and export behavior have focused tests.
 - [ ] Add a friendly error path for canceled selection, bad/corrupt PDFs, missing roster, missing Tesseract, table-detection failures, date failures, and Excel write failures.
 - [ ] Validate the roster (file exists, non-empty entries, duplicates) and surface configuration/dependency problems before processing.
-- [ ] Add a maximum-skew threshold: reject PDFs whose detected skew is too large for reliable correction, with a clear error explaining that excessive skew can cause vertical-line detection to fail.
+- [ ] Add a maximum-skew threshold: identify and reject PDFs whose detected skew is above 0.5 degrees, with a clear error explaining that excessive skew can cause vertical-line detection to fail. Investigate expanding the image border before deskewing so rotation does not clip content.
 - [ ] Add persistent roster storage or a cache so the student roster is retained between runs, with a clear way to refresh it when the source roster changes.
 - [ ] Fully integrate `AttendanceRecord` and `DailySheet` into the pipeline's inputs/outputs instead of declaring the dataclasses while returning only a DataFrame.
 - [ ] Add focused tests for date parsing/state across PDFs, pipeline failures, and per-file batch failure behavior; run a repeatable manual end-to-end audit against representative scans.
@@ -187,11 +189,77 @@ These items consolidate unfinished work noted across the docs and compare them w
 - [ ] Evaluate orientation correction (`rotate.py`) and keep/tune deskew only after validation against representative scans.
 - [x] Add Excel presentation basics: shared content-sized columns, centered cells, distinct headers, thin populated-cell borders, and status/review row highlights.
 - [ ] Consider filters, a useful column order, or a separate summary sheet.
-- [ ] Add a local web interface that runs on localhost and calls the same pipeline; keep web routes/UI code separate from OCR processing.
-- [ ] If needed, add an API/job interface and background processing after a GUI/web workflow is stable.
-- [ ] Explore Docker/CI infrastructure and later AWS services (S3, container-based Lambda, API Gateway, SQS, DynamoDB, IAM) as explicitly later learning/deployment phases, not current app capabilities.
+- [ ] Add a fallback for data-detection failure (low priority, unlikely to occur).
+- [ ] Add a debug-mode GUI to select horizontal/vertical line coordinates (low priority).
+- [ ] Add reporting and logging (low priority; see `reporting.summary`/`reporting.logger` in Priority 2).
+
+### Architecture and tooling
+
+- [ ] Change the output folder to the reconciliation stage folder.
+- [ ] Reorganize modules into appropriate folders.
+- [ ] Add integration tests that combine a few pipeline steps without running the entire pipeline.
+- [ ] Test Docker containerization (build image, run the pipeline with Tesseract inside the container).
+- [ ] Evaluate Apache Airflow integration, if feasible.
+- [ ] Create a local web app for headless deployment (localhost, calling the same pipeline; keep web routes/UI code separate from OCR processing) and move away from the CLI to a different stack.
+- [ ] Bash wrapper around the CLI entrypoint:
+  - [ ] Environment setup and dependency checks
+  - [ ] Argument parsing (PDF path, date)
+  - [ ] Logging output to a file
+
+### API layer (Phase 3.5 — FastAPI)
+
+Formalizes the web interface as a real API with async job handling, rather than a simple web form. Do this after the GUI/web workflow is stable.
+
+- [ ] `POST /attendance/jobs` — upload a PDF and start processing as a background task.
+- [ ] `GET /attendance/jobs/{id}` — poll status/result.
+- [ ] `GET /attendance/jobs/{id}/export` — return the Excel file.
+- [ ] Background task handling (FastAPI `BackgroundTasks`, or Celery for queue practice).
+- [ ] Job state tracking (in-memory dict for this phase; DB or DynamoDB later).
+
+### Phase 4 — Cloud / AWS integration
+
+Goal: learn AWS Solutions Architect Associate material by applying it to this project (a later learning/deployment phase, not a current app capability). This moves *where* pipeline steps run; it does not rewrite pipeline logic. Suggested order:
+
+- [ ] **S3** — landing zone for uploaded PDFs and destination for exported Excel files (file ingestion, then S3 trigger).
+- [ ] **Lambda** — run the pipeline. Tesseract and OpenCV are too heavy for a zip-based Lambda, so plan for a container-image Lambda (ECR) from the start. Dependency weight matters everywhere, not only in desktop packaging.
+- [ ] **API Gateway** — fronts the Lambda with the same `/attendance/jobs` shape, now serverless.
+- [ ] **SQS** — decouples upload from processing so a large scan does not block the request.
+- [ ] **DynamoDB** — job status/results tracking, replacing the local job-state dict.
+- [ ] **IAM** — practice least-privilege roles between these services.
+
+Concepts to be able to articulate (cert-relevant, not just implementation):
+
+- Compute models: VMs vs containers vs serverless (cold starts, scaling, cost per request vs per hour).
+- Storage models: object vs block vs file storage.
+- Managed vs self-hosted tradeoffs (for example DynamoDB vs self-run Postgres on EC2).
+- Elasticity and the pay-for-use cost model.
+
+### Overall auditing app
+
+- [ ] Create a PostgreSQL database storing student IDs, DYCD name, and sheet name.
+- [ ] Update the database during every weekly activity-level audit.
+
+### Things to investigate
+
+- [ ] Do 300 DPI renders lose information relative to the 600 DPI scans? (The pipeline renders at the configured `DPI`, default 300.)
+- [ ] Why does rotation correction cause OCR failures?
+- [ ] Would Hough line detection be more robust than the current vertical/horizontal line detection?
+- [ ] Explain why the current horizontal and vertical line parameters work.
+
+### Interview/demo talking points (ISEP)
+
+Be able to articulate:
+
+- Why Tesseract as a system dependency matters for deployment.
+- What the Dockerfile buys you over a local setup.
+- What the CI pipeline catches automatically.
 
 ## Documentation reconciliation notes
+
+- **Pipeline documentation corrections (from review):**
+  - HoughLinesP and Canny edge detection are not used in table detection. Table detection uses OpenCV line-detection helpers only; any doc text saying otherwise is wrong.
+  - Hough line detection is used only in skew detection (`deskew.py`). Note: the code currently calls `cv2.HoughLines` (not `HoughLinesP`) on a Canny edge map there, so Canny is used in skew detection too. Reconcile this wording with your review note.
+  - Image size is no longer a constraint, but memory use still needs to be checked so it is not wasted (for example, all rendered pages are held as full-resolution arrays at once).
 
 - `MVP_ROADMAP.md` and `PROJECT_STRUCTURE.md` contain stale “placeholder/not implemented” statuses for features now present, including classification, reconciliation, pipeline orchestration, roster loading, and Excel export. They also describe older package paths such as `io/` instead of the current `io_utils/`.
 - `Attendance-OCR-App-Roadmap.md` marks some MVP steps complete, but the current `main.py` contradicts its claim that a validated manual date prompt is active and that the end-to-end CLI flow is complete. Treat the checklist as historical planning, not proof of current behavior.

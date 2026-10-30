@@ -42,15 +42,15 @@ Your primary constraint is **exe file size**, not OCR accuracy. Don't let accura
 **Goal:** Demonstrate automation-engineering fundamentals (Bash, Linux, Docker, YAML/CI) — the skills ISEP explicitly trains on (their own postings mention Ansible/YAML-driven automation across infra). This phase wraps the finished MVP; it doesn't require touching pipeline logic.
 
 ### Steps, in order
-- [ ] **Dockerfile** — containerize the app. This solves a real problem: Tesseract + OpenCV + PyMuPDF as system-level dependencies are exactly what makes local setup painful.
-  - [ ] Base image (slim Python)
-  - [ ] `apt-get install tesseract-ocr` and any OpenCV system deps
-  - [ ] `pip install` from `requirements.txt`
-  - [ ] Entrypoint runs the CLI (or later, the API)
+- [x] **Dockerfile** — containerize the app. This solves a real problem: Tesseract + OpenCV + PyMuPDF as system-level dependencies are exactly what makes local setup painful.
+  - [x] Base image (slim Python)
+  - [x] `apt-get install tesseract-ocr` and any OpenCV system deps
+  - [x] `pip install` from `requirements.txt`
+  - [x] Entrypoint runs the CLI (or later, the API)
   - [ ] Test: `docker build` + `docker run` against a sample PDF, confirm Excel output
-- [ ] **GitHub Actions YAML** — CI pipeline, hooks naturally into your existing Git Flow branching
-  - [ ] Trigger on push/PR to `dev` and `main`
-  - [ ] Steps: checkout → install deps (or build Docker image) → run `pytest`
+- [x] **GitHub Actions YAML** — CI pipeline, hooks naturally into your existing Git Flow branching
+  - [x] Trigger on push/PR to `dev` and `main`
+  - [x] Steps: checkout → install deps (or build Docker image) → run `pytest`
   - [ ] Optional: lint step (flake8/black)
 - [ ] **Bash wrapper** — shell script around the CLI entrypoint
   - [ ] Env setup / dependency checks

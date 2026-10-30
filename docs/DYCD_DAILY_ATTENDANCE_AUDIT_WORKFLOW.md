@@ -111,15 +111,15 @@ Each workbook worksheet uses these columns, in order: `Date`, `OCR Raw`, `Attend
 
 **Recommended discrepancy output:** Keep one row per issue and include the date, DYCD ID (when known), DYCD name, internal sheet name, DYCD status, physical-sheet status, OCR match score/flag, source filename, and a concise issue/review note. Retain the source values so a reviewer can trace each finding back to both inputs.
 
-**Demo implementation:** From the repository root, run:
+**Implementation:** From the repository root, run:
 
 ```text
-python demo-data/attendance_reconciliation.py
+python -m daily_attendance_audit
 ```
 
-By default, the script reads the three example workbooks in `demo-data/`. Use `--dycd`, `--ocr`, `--roster`, and `--output` to specify different files. It matches worksheets by their `MM-DD-YYYY` titles and writes `All Results`, `Issues`, and `Summary` tabs. The report retains merge indicators and includes unmatched roster names and records found on only one side. Name lookup is an exact crosswalk lookup after trimming/collapsing spaces and ignoring case; it does not perform fuzzy matching or automatically resolve unmatched names.
+By default, the script reads the three example workbooks in `daily_attendance_audit/`. Use `--dycd`, `--ocr`, `--roster`, and `--output` to specify different files. It matches worksheets by their `MM-DD-YYYY` titles and writes `All Results`, `Issues`, and `Summary` tabs. The report retains merge indicators and includes unmatched roster names and records found on only one side. Name lookup is an exact crosswalk lookup after trimming/collapsing spaces and ignoring case; it does not perform fuzzy matching or automatically resolve unmatched names.
 
-The script delegates its work to small modules in `demo-data/attendance_audit/`: `workbook_io.py` reads and validates the Excel inputs, `comparison.py` links OCR names to DYCD IDs and compares attendance, and `reporting.py` creates the output workbook. `attendance_reconciliation.py` is the command-line entry point that connects these steps.
+The script delegates its work to small modules in `daily_attendance_audit/`: `workbook_io.py` reads and validates the Excel inputs, `comparison.py` links OCR names to DYCD IDs and compares attendance, and `reporting.py` creates the output workbook. `cli.py` is the command-line entry point that connects these steps.
 
 ### 5. Resolve findings and retain an audit trail
 
@@ -127,7 +127,7 @@ Review each discrepancy against the original DYCD export and the physical sheet.
 
 ## Current application boundaries
 
-The OCR application implements the physical-sheet digitization and fuzzy name matching described in Step 3. It exports OCR names and matched roster names, but its current OCR output does **not** include a DYCD ID. The demo comparison utility at `demo-data/attendance_reconciliation.py` uses the separate crosswalk workbook to perform the final DYCD-versus-physical comparison. The utility is standalone and is not part of the OCR application's runtime.
+The OCR application implements the physical-sheet digitization and fuzzy name matching described in Step 3. It exports OCR names and matched roster names, but its current OCR output does **not** include a DYCD ID. The comparison utility at `daily_attendance_audit/` (run with `python -m daily_attendance_audit`) uses the separate crosswalk workbook to perform the final DYCD-versus-physical comparison. The utility is standalone and is not part of the OCR application's runtime.
 
 The activity-level audit is implemented in the separate activity-level audit application, not in this OCR application's repository. The Arrival selection and fallback behavior described in Step 1 should be kept consistent with that audit output.
 
