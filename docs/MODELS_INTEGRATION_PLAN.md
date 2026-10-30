@@ -154,6 +154,30 @@ The headless image does not install Tkinter, so confirm nothing imported by `bat
 - **Crop views.** Forgetting `.copy()` on a kept crop pins an entire page image in memory and defeats the optimization.
 - **Roster-dependent review.** The review dialog needs the roster; pass it from the caller rather than storing it on records.
 
+Design points
+Validate the status and flag values at the edges. Literal is only checked by a type checker. The classifier and reconciliation return plain strings, so a typo like "Presnt" would reach the exporter at runtime. Consider an Enum (AttendanceStatus(str, Enum)) so values are fixed and still compare equal to strings, or keep Literal and add a test that asserts the classifier only returns those three values.
+
+reviewed and match_flag together can contradict each other. A record could be reviewed=True with a Strong Match flag, or reviewed=False with a resolved flag. Pick one rule, for example "the exporter derives the final flag from reviewed", and document it so the Excel highlighting (which keys on the flag text) stays consistent. The current row colors depend on Low Match - Needs Review and NEED-MANUAL-ENTRY; a reviewed record should no longer get the gold highlight.
+
+Skipped records are different from untouched ones. Skipping in the review UI currently leaves the flag unchanged. With the new model that means reviewed stays False but the crop is cleared. That's fine for export, but don't use review_crop is None as a "needs review" test. Use the flag plus reviewed.
+
+Don't store the roster or config on the model. Pass them in, as the plan says. Keeping the models as plain data makes them easy to build in tests.
+
+Add a convenience property rather than repeating logic. For example needs_review on AttendanceRecord, defined as match_flag in REVIEW_FLAGS and not reviewed. It prevents the review step, batch loop and tests from each reimplementing it. If you do this, REVIEW_FLAGS must live in a module that models.py can import without a cycle (constants, not manual_review).
+
+Practical pitfalls
+datetime vs date. sheet_date is a datetime from strptime. The exporter normalizes to midnight, so that's fine, but mixing in a date later will break the groupby.
+Mutable default and shared records. field(default_factory=list) is correct. Don't share one list between DailyAttendance objects.
+Pickling and multiprocessing. If you ever parallelize PDFs, records carrying NumPy crops pickle fine, but large crops make that slow. The memory strategy helps here too.
+Row order. The flat export relies on records being in sheet order. Keep records in a list and don't reorder them during review.
+Page index. It's currently only informational. Use it in a "source page" column if you later want a trace back to the scan.
+Database later. The model fields map directly to columns, and review_crop should be excluded. A SQLAlchemy or dataclasses.asdict conversion would copy the array, so write an explicit conversion that skips it, since asdict deep-copies NumPy arrays.
+Tests. Add small builders or a factory fixture in tests/conftest.py so tests aren't repeating all nine fields for every record.
+Not needed yet
+A separate ReviewDecision object, per-page models, and an enum for flags are reasonable later, but none is required for this migration.
+
+I'd add the needs_review property and the status check (points 1 and 5) to the plan, as they affect how steps 3 and 4 are written. I can update the plan file if you'd like.
+
 ## Future work (not in this plan)
 
 - Database writer alongside `excel_output` (choice of database undecided).
