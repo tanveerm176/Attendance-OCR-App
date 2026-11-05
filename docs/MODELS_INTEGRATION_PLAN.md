@@ -25,6 +25,8 @@ from typing import Literal
 
 import numpy as np
 
+from ocr_pipeline.constants import REVIEW_FLAGS
+
 
 @dataclass
 class AttendanceRecord:
@@ -39,6 +41,10 @@ class AttendanceRecord:
     reviewed: bool = False
     # Only populated for records that need manual review; cleared afterwards.
     review_crop: np.ndarray | None = field(default=None, repr=False, compare=False)
+
+    @property
+    def needs_review(self) -> bool:
+        return self.match_flag in REVIEW_FLAGS and not self.reviewed
 
 
 @dataclass
@@ -63,7 +69,7 @@ Open naming decision: the current DataFrame columns are `ocr_raw`, `matched_scor
 
 ## Shared constants
 
-Create `ocr_pipeline/constants.py` (or add to `reconciliation.py`) with the flag values currently scattered across modules:
+Create `ocr_pipeline/constants.py` (required, so `models.py` can import `REVIEW_FLAGS` without an import cycle) with the flag values currently scattered across modules:
 
 - `STRONG_MATCH_LABEL`, `LOW_MATCH_LABEL`, `EMPTY_ROW_LABEL`, `RESOLVED_MANUALLY_FLAG`
 - `NEED_MANUAL_ENTRY_FLAG = "NEED-MANUAL-ENTRY"`
@@ -111,7 +117,7 @@ Each step should be its own commit, with the test suite passing after each one.
 
 ### 4. Convert manual review
 
-- `review_flagged_records` takes and returns `list[AttendanceRecord]` (or a `DailyAttendance`), selecting records with `match_flag in REVIEW_FLAGS and not reviewed`.
+- `review_flagged_records` takes and returns `list[AttendanceRecord]` (or a `DailyAttendance`), selecting records with `record.needs_review`.
 - Replace positional `iat` lookups with attribute access.
 - On confirmation set `matched_name`, `reviewed = True`, and `review_crop = None`.
 - Keep the injectable `dialog` parameter used by tests. Tkinter stays in this module for now.
@@ -154,29 +160,19 @@ The headless image does not install Tkinter, so confirm nothing imported by `bat
 - **Crop views.** Forgetting `.copy()` on a kept crop pins an entire page image in memory and defeats the optimization.
 - **Roster-dependent review.** The review dialog needs the roster; pass it from the caller rather than storing it on records.
 
-Design points
-Validate the status and flag values at the edges. Literal is only checked by a type checker. The classifier and reconciliation return plain strings, so a typo like "Presnt" would reach the exporter at runtime. Consider an Enum (AttendanceStatus(str, Enum)) so values are fixed and still compare equal to strings, or keep Literal and add a test that asserts the classifier only returns those three values.
+## Additional model guidance
 
-reviewed and match_flag together can contradict each other. A record could be reviewed=True with a Strong Match flag, or reviewed=False with a resolved flag. Pick one rule, for example "the exporter derives the final flag from reviewed", and document it so the Excel highlighting (which keys on the flag text) stays consistent. The current row colors depend on Low Match - Needs Review and NEED-MANUAL-ENTRY; a reviewed record should no longer get the gold highlight.
-
-Skipped records are different from untouched ones. Skipping in the review UI currently leaves the flag unchanged. With the new model that means reviewed stays False but the crop is cleared. That's fine for export, but don't use review_crop is None as a "needs review" test. Use the flag plus reviewed.
-
-Don't store the roster or config on the model. Pass them in, as the plan says. Keeping the models as plain data makes them easy to build in tests.
-
-Add a convenience property rather than repeating logic. For example needs_review on AttendanceRecord, defined as match_flag in REVIEW_FLAGS and not reviewed. It prevents the review step, batch loop and tests from each reimplementing it. If you do this, REVIEW_FLAGS must live in a module that models.py can import without a cycle (constants, not manual_review).
-
-Practical pitfalls
-datetime vs date. sheet_date is a datetime from strptime. The exporter normalizes to midnight, so that's fine, but mixing in a date later will break the groupby.
-Mutable default and shared records. field(default_factory=list) is correct. Don't share one list between DailyAttendance objects.
-Pickling and multiprocessing. If you ever parallelize PDFs, records carrying NumPy crops pickle fine, but large crops make that slow. The memory strategy helps here too.
-Row order. The flat export relies on records being in sheet order. Keep records in a list and don't reorder them during review.
-Page index. It's currently only informational. Use it in a "source page" column if you later want a trace back to the scan.
-Database later. The model fields map directly to columns, and review_crop should be excluded. A SQLAlchemy or dataclasses.asdict conversion would copy the array, so write an explicit conversion that skips it, since asdict deep-copies NumPy arrays.
-Tests. Add small builders or a factory fixture in tests/conftest.py so tests aren't repeating all nine fields for every record.
-Not needed yet
-A separate ReviewDecision object, per-page models, and an enum for flags are reasonable later, but none is required for this migration.
-
-I'd add the needs_review property and the status check (points 1 and 5) to the plan, as they affect how steps 3 and 4 are written. I can update the plan file if you'd like.
+- **Validate status values.** `Literal` is only checked by a type checker, and the classifier returns plain strings. Add a test asserting the attendance classifier only returns `Present`, `Absent`, or `EMPTY CELL` (or switch to an `AttendanceStatus(str, Enum)` later).
+- **`reviewed` vs `match_flag`.** Rule: the original `match_flag` is never overwritten. The exporter derives the final flag from `reviewed` (`Resolved - Manual Review`), and row highlighting must key on that final flag, so reviewed records lose the gold highlight.
+- **Skipped records.** Skipping leaves `reviewed = False` and clears the crop. Never use `review_crop is None` to decide whether review is needed; use `needs_review`.
+- **Keep models plain data.** Do not store the roster, config, Tkinter objects, or DataFrames on them.
+- **`datetime` only.** `sheet_date` stays a `datetime` (midnight); mixing in `date` objects breaks the exporter's grouping.
+- **Row order.** Export relies on records staying in sheet order; review must not reorder them.
+- **`page_index`.** Informational for now; usable later as a "source page" column.
+- **Database later.** Write an explicit record-to-row conversion that skips `review_crop`. `dataclasses.asdict` deep-copies NumPy arrays.
+- **Test factory.** Add a record builder fixture in `tests/conftest.py` so tests don't repeat every field.
+- **Multiprocessing.** If PDFs are ever processed in parallel, crops are pickled; the memory strategy keeps this small.
+- **Not needed yet:** a `ReviewDecision` object, per-page models, or a flag enum.
 
 ## Future work (not in this plan)
 
