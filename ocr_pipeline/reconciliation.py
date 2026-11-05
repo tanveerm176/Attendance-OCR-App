@@ -2,13 +2,14 @@ import re
 import pandas as pd
 from rapidfuzz import process, fuzz, utils
 
+from ocr_pipeline.constants import (
+    EMPTY_ROW_LABEL,
+    LOW_MATCH_LABEL,
+    NEED_MANUAL_ENTRY_FLAG,
+    STRONG_MATCH_LABEL,
+    WRITTEN_NAME_MARKER,
+)
 from ocr_pipeline.exceptions import OCRExtractionError, NoMatchFoundError
-
-LOW_MATCH_SCORE_FLOOR = 30 # any match_score below this is treated as noise not a 
-                           #    genuine match with a low confidence score
-LOW_MATCH_LABEL = 'Low Match - Needs Review'                           
-STRONG_MATCH_LABEL = 'Strong Match'
-EMPTY_ROW_LABEL = 'EMPTY CELL'
 
 def clean_ocr_name(name: str) -> str:
     cleaned_name = re.sub(r'[^a-zA-Z\s\-\']', '', name).strip()
@@ -28,10 +29,10 @@ def fuzzy_match_names(df: pd.DataFrame, roster: list[str],
         cleaned = clean_ocr_name(raw_name)
         cleaned_names.append(cleaned)
 
-        if cleaned == 'WRITTEN NAME DETECTED':
+        if cleaned == WRITTEN_NAME_MARKER:
             matched_names.append(None)
             matched_scores.append(0.0)
-            flags.append('NEED-MANUAL-ENTRY')
+            flags.append(NEED_MANUAL_ENTRY_FLAG)
             continue
 
 

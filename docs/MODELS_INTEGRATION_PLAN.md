@@ -39,7 +39,7 @@ class AttendanceRecord:
     attendance_status: Literal["Present", "Absent", "EMPTY CELL"]
     is_handwritten: bool = False
     reviewed: bool = False
-    # Only populated for records that need manual review; cleared afterwards.
+    # Kept for unresolved records that still need manual review.
     review_crop: np.ndarray | None = field(default=None, repr=False, compare=False)
 
     @property
@@ -86,7 +86,7 @@ Most of the saving comes from reconciling each record immediately, not from the 
 2. **Handwritten regions follow the same rule.** They are always `NEED-MANUAL-ENTRY`, so their crops are kept for review.
 3. **Always `.copy()` a kept crop.** A NumPy slice is a view that keeps the whole table image alive. This includes the handwritten crop, which currently holds `written_names.copy()` only for the review list.
 4. **Store grayscale crops.** The handwritten crop is currently RGB (three times the size). The review UI converts for display.
-5. **Clear after review.** Set `review_crop = None` and `reviewed = True` once a record is resolved. Skipped records lose their crop once the review window closes.
+5. **Clear after resolution only.** Set `review_crop = None` and `reviewed = True` once a record is resolved. Skipping leaves `reviewed = False` and keeps the crop so the record remains reviewable in a later pass.
 6. **Render pages lazily.** Add `iter_pdf_pages(pdf_path)` to `ocr_pipeline/ingestion.py` as a generator so only one full-page image exists at a time. Keep `pdf_to_image()` as a list wrapper so `tests/test_ingestion.py` keeps passing.
 
 Expected peak memory: one page image plus that page's table crops, plus a handful of small review crops, rather than every crop for the whole PDF.
@@ -164,7 +164,7 @@ The headless image does not install Tkinter, so confirm nothing imported by `bat
 
 - **Validate status values.** `Literal` is only checked by a type checker, and the classifier returns plain strings. Add a test asserting the attendance classifier only returns `Present`, `Absent`, or `EMPTY CELL` (or switch to an `AttendanceStatus(str, Enum)` later).
 - **`reviewed` vs `match_flag`.** Rule: the original `match_flag` is never overwritten. The exporter derives the final flag from `reviewed` (`Resolved - Manual Review`), and row highlighting must key on that final flag, so reviewed records lose the gold highlight.
-- **Skipped records.** Skipping leaves `reviewed = False` and clears the crop. Never use `review_crop is None` to decide whether review is needed; use `needs_review`.
+- **Skipped records.** Skipping leaves `reviewed = False` and keeps the crop. The record remains `needs_review` and can be offered again in a later review pass. Never use `review_crop is None` to decide whether review is needed; use `needs_review`.
 - **Keep models plain data.** Do not store the roster, config, Tkinter objects, or DataFrames on them.
 - **`datetime` only.** `sheet_date` stays a `datetime` (midnight); mixing in `date` objects breaks the exporter's grouping.
 - **Row order.** Export relies on records staying in sheet order; review must not reorder them.

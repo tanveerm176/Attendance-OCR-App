@@ -11,17 +11,13 @@ import pandas as pd
 import tkinter as tk
 from tkinter import ttk
 
-from ocr_pipeline.exceptions import NoMatchFoundError, OCRExtractionError
-from ocr_pipeline.reconciliation import LOW_MATCH_LABEL
+from ocr_pipeline.constants import (
+    LOW_MATCH_LABEL,
+    RESOLVED_MANUALLY_FLAG,
+    REVIEW_FLAGS,
+)
 
 REVIEW_CROP_COLUMN = "_review_crop"
-RESOLVED_MANUALLY_FLAG = "Resolved - Manual Review"
-REVIEW_FLAGS = {
-    OCRExtractionError.__name__,
-    NoMatchFoundError.__name__,
-    LOW_MATCH_LABEL,
-    "NEED-MANUAL-ENTRY",
-}
 
 NameSelectionDialog = Callable[
     [np.ndarray, str, str, float, Sequence[str], str | None],

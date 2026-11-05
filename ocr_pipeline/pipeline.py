@@ -13,6 +13,7 @@ from ocr_pipeline import (ingestion,
                           detect_date)
 
 from ocr_pipeline.config import PipelineConfig
+from ocr_pipeline.constants import WRITTEN_NAME_MARKER
 from ocr_pipeline.exceptions import TableDetectionError
 import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
@@ -167,7 +168,7 @@ class OCRPipeline:
                 written_flag = False
 
             if written_flag:
-                ocr_names.append('WRITTEN NAME DETECTED')
+                ocr_names.append(WRITTEN_NAME_MARKER)
                 attendance_statuses.append('Present')
                 review_crops.append(written_review_crop)
 
