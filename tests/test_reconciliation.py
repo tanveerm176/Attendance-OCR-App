@@ -1,6 +1,16 @@
-from ocr_pipeline.reconciliation import clean_ocr_name, fuzzy_match_names
-import pandas as pd
 import re
+
+import pandas as pd
+
+from ocr_pipeline.constants import (
+    EMPTY_ROW_LABEL,
+    LOW_MATCH_LABEL,
+    NEED_MANUAL_ENTRY_FLAG,
+    STRONG_MATCH_LABEL,
+    WRITTEN_NAME_MARKER,
+)
+from ocr_pipeline.exceptions import NoMatchFoundError, OCRExtractionError
+from ocr_pipeline.reconciliation import clean_ocr_name, fuzzy_match_names, match_name
 
 SAMPLE_OCR_NAME = 'Ciutron, Tyler 7 |'
 SAMPLE_DF = pd.read_csv('tests/sample_data/OCR_Name_Attendance.csv')
@@ -34,3 +44,53 @@ def test_blank_name_in_empty_attendance_cell_is_not_flagged_for_manual_review():
     result = fuzzy_match_names(dataframe, ["Student A"])
 
     assert result["flag"].tolist() == ["EMPTY CELL", "OCRExtractionError"]
+
+
+def test_match_name_returns_strong_match_details():
+    assert match_name("Student A", "Present", ["Student A"], 80, 30) == (
+        "Student A",
+        "Student A",
+        100.0,
+        STRONG_MATCH_LABEL,
+    )
+
+
+def test_match_name_preserves_special_case_flags():
+    assert match_name(WRITTEN_NAME_MARKER, "Present", [], 80, 30) == (
+        WRITTEN_NAME_MARKER,
+        None,
+        0.0,
+        NEED_MANUAL_ENTRY_FLAG,
+    )
+    assert match_name("", EMPTY_ROW_LABEL, ["Student A"], 80, 30) == (
+        "",
+        None,
+        0.0,
+        EMPTY_ROW_LABEL,
+    )
+    assert match_name("", "Present", ["Student A"], 80, 30) == (
+        "",
+        None,
+        0.0,
+        OCRExtractionError.__name__,
+    )
+    assert match_name("Student A", "Present", [], 80, 30) == (
+        "Student A",
+        None,
+        0.0,
+        NoMatchFoundError.__name__,
+    )
+
+
+def test_match_name_applies_match_score_thresholds():
+    low_confidence_match = match_name(
+        "Jonathan Smith", "Present", ["Jonathan Smyth"], 100, 30
+    )
+    assert low_confidence_match[1] == "Jonathan Smyth"
+    assert low_confidence_match[3] == LOW_MATCH_LABEL
+
+    noise_match = match_name(
+        "Jonathan Smith", "Present", ["Jonathan Smyth"], 100, 99
+    )
+    assert noise_match[1] == "Jonathan Smyth"
+    assert noise_match[3] == NoMatchFoundError.__name__
