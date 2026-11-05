@@ -111,7 +111,7 @@ Each step should be its own commit, with the test suite passing after each one.
 
 - Build one `AttendanceRecord` per row (replaces the parallel `ocr_names`, `attendance_statuses`, and `review_crops` lists, which could fall out of step).
 - Call `match_name` per row and keep the crop only for review flags.
-- Replace `DailySheet.sheet_date = ...` with a local `sheet_date`, and return it on `DailyAttendance`. Decide a policy for PDFs where no date is detected (leave `None` and let the caller fail or fall back).
+- Replace `DailySheet.sheet_date = ...` with a local `sheet_date`, and return it on `DailyAttendance`. Policy for PDFs where no date is detected : prompt the user to enter a date from a GUI
 - Remove unused imports (`matplotlib`, `mpimg`, `rotate`) and drop `matplotlib` from `pyproject.toml` if nothing else uses it.
 - Optionally switch the page loop to `ingestion.iter_pdf_pages`.
 
