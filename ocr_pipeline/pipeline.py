@@ -13,27 +13,53 @@ from ocr_pipeline import (ingestion,
                           detect_date)
 
 from ocr_pipeline.config import PipelineConfig
-from ocr_pipeline.constants import WRITTEN_NAME_MARKER
+from ocr_pipeline.constants import WRITTEN_NAME_MARKER, NEED_MANUAL_ENTRY_FLAG
 from ocr_pipeline.exceptions import TableDetectionError
 import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
-from ocr_pipeline.models import DailyAttendance
+from ocr_pipeline.models import DailyAttendance, AttendanceRecord
+from ocr_pipeline.constants import REVIEW_FLAGS
+
 
 class OCRPipeline:
+    """Run the configured OCR and attendance-recognition steps on a PDF."""
+
     def __init__(self, config: PipelineConfig):
+        """Store the roster and processing settings used for each PDF."""
         self.config = config
 
-    def run(self, pdf_path: Path) -> pd.DataFrame:
+    def run(self, pdf_path: Path) -> DailyAttendance:
+        """Extract attendance records from every page of a sign-in-sheet PDF.
+
+        Each page is deskewed, its table boundaries are detected, and student
+        names and attendance marks are read and matched against the configured
+        roster. Flagged names retain an image crop for manual review. A detected
+        handwritten-name section is represented by a separate review record.
+
+        Args:
+            pdf_path: Path to the PDF to process.
+
+        Returns:
+            A ``DailyAttendance`` instance containing the extracted records,
+            any detected sheet date, and the source PDF.
+
+        Raises:
+            TableDetectionError: If the table does not have enough detected
+                boundaries to identify the configured columns or rows.
+            ValueError: If attendance classification 
+                returns an unsupported status.
+        """
         cfg = self.config
+        daily_attendance = DailyAttendance(source_pdf=pdf_path)
 
         # --- Stage 0: PDF Ingestion -> list[RGB Images] ---
         image_list = ingestion.pdf_to_image(pdf_path)
 
-        ocr_names = []
-        attendance_statuses = []
-        review_crops = []
+        # ocr_names = []
+        # attendance_statuses = []
+        # review_crops = []
 
-        for img_rgb in image_list:
+        for img_index, img_rgb in enumerate(image_list):
 
             # --- Stage 1: Convert to Grayscale ---
             img_gray = cv2.cvtColor(img_rgb, cv2.COLOR_RGB2GRAY)
@@ -90,8 +116,8 @@ class OCRPipeline:
 
             # cv2.imwrite("page_header.png", page_header)
             if page_header.shape[0] >= 400:
-                DailyAttendance.sheet_date = detect_date.detect_sheet_date(table_img_gray, horizontal_lines, vertical_lines)
-                print(f'{DailyAttendance.sheet_date}')
+                daily_attendance.sheet_date = detect_date.detect_sheet_date(table_img_gray, horizontal_lines, vertical_lines)
+                print(f'{daily_attendance.sheet_date}')
                 print(f'On Main Page, Header Skipped by {cfg.skip_header_start_row} lines')
                 horizontal_lines = horizontal_lines[cfg.skip_header_start_row:]   
                 print(f'After Header Skipped {horizontal_lines}')
@@ -130,23 +156,50 @@ class OCRPipeline:
                 )
             )
 
+            student_index = 1
             # Process only intervals consistent with the typical student-row height.
             for row_top_line, row_bottom_line in student_rows:
+                
+
                 table_row_rgb = img_cropping.horizontal_img_crop(table_img_rgb, row_top_line, row_bottom_line)
                 
                 # Name sub-crop -> grayscale (tesseract_ocr requires Grayscale Img input)
                 name_crop_rgb = img_cropping.vertical_img_crop(table_row_rgb, name_x_start+1, name_x_end-10)
                 name_crop_rgb = ocr.remove_red_strikethrough(name_crop_rgb)
                 name_crop_gray = cv2.cvtColor(name_crop_rgb, cv2.COLOR_RGB2GRAY)
-                review_crops.append(name_crop_gray.copy())
+                # review_crops.append(name_crop_gray.copy())
                 ocr_name = ocr.tesseract_ocr(name_crop_gray)
 
                 # Attendance sub-crop -> stays RGB for color classification
                 attendance_crop_rgb = img_cropping.vertical_img_crop(table_row_rgb, attendance_x_start, attendance_x_end)
                 attendance_status = classification.classify_attendance(attendance_crop_rgb)
 
-                ocr_names.append(ocr_name)
-                attendance_statuses.append(attendance_status)
+                # Pass each OCR Name for Fuzzy-Matching and Flagging 
+                clean_name, match_name, match_score, match_flag = reconciliation.match_name(ocr_name, attendance_status, 
+                                          cfg.roster, cfg.fuzzy_match_threshold, cfg.low_match_floor)
+
+                # Verify attendance_status is one of the Lieterals
+                if attendance_status not in ('Present', 'Absent', 'EMPTY CELL'):
+                    raise ValueError(f'Invalid attendance status:{attendance_status}')
+
+                # Init an AttendanceRecord instance for each name, store crops only when name is flagged
+                attendance_record = AttendanceRecord(
+                    record_index = student_index,
+                    page_index = img_index,
+                    ocr_name = ocr_name,
+                    cleaned_name = clean_name,
+                    matched_name = match_name,
+                    match_score = match_score,
+                    match_flag = match_flag,
+                    attendance_status = attendance_status,
+                    review_crop = name_crop_gray.copy() if match_flag in REVIEW_FLAGS else None
+                )
+
+                # Append each Attendance Record to each Daily Attendance instance
+                daily_attendance.records.append(attendance_record)
+                # ocr_names.append(ocr_name)
+                # attendance_statuses.append(attendance_status)
+                student_index += 1
 
             # ---- Detect Handwritten Names at Bottom of Sheet if any ----
             written_start, written_end = handwritten_bounds
@@ -155,6 +208,8 @@ class OCRPipeline:
             )
             # cv2.imwrite("./output/debug_images/debug_written_section.png", written_section)
 
+            # Initialize written review crop to None to prevent it being unbound
+            written_review_crop = None
             if written_section.size:
                 written_names = img_cropping.vertical_img_crop(
                     written_section, name_x_start, name_x_end
@@ -168,37 +223,51 @@ class OCRPipeline:
                 written_flag = False
 
             if written_flag:
-                ocr_names.append(WRITTEN_NAME_MARKER)
-                attendance_statuses.append('Present')
-                review_crops.append(written_review_crop)
+                written_attendance_record = AttendanceRecord(
+                 page_index = img_index,
+                 record_index = student_index,
+                 ocr_name = WRITTEN_NAME_MARKER,
+                 cleaned_name = WRITTEN_NAME_MARKER,
+                 matched_name = None,
+                 match_score = 0.0,
+                 match_flag = NEED_MANUAL_ENTRY_FLAG,
+                 attendance_status = 'Present',
+                 review_crop = written_review_crop,
+                 is_handwritten = True)
+                
+                daily_attendance.records.append(written_attendance_record)
+
+                # ocr_names.append(WRITTEN_NAME_MARKER)
+                # attendance_statuses.append('Present')
+                # review_crops.append(written_review_crop)
 
             print('Processed one sheet\n')
                 
-        # --- Stage 6: Assemble Raw Dataframe ---
-        attendance_df = pd.DataFrame({
-            'ocr_raw': ocr_names,
-            'attendance': attendance_statuses,
-            '_review_crop': review_crops,
-        })
+        # # --- Stage 6: Assemble Raw Dataframe ---
+        # attendance_df = pd.DataFrame({
+        #     'ocr_raw': ocr_names,
+        #     'attendance': attendance_statuses,
+        #     '_review_crop': review_crops,
+        # })
 
-        # if written_flag:
-        #     manual_entry = pd.DataFrame([{'ocr_raw': 'WRITTEN NAME DETECTED', 'attendance': 'Present'}])
-        #     attendance_df = pd.concat([attendance_df, manual_entry], ignore_index=True)
+        # # if written_flag:
+        # #     manual_entry = pd.DataFrame([{'ocr_raw': 'WRITTEN NAME DETECTED', 'attendance': 'Present'}])
+        # #     attendance_df = pd.concat([attendance_df, manual_entry], ignore_index=True)
 
-        # --- Stage 7: Reconciliation (clean + fuzzy_match + flag)
-        print(f"Reconciling {len(attendance_df)} extracted records against the roster...")
-        reconciled_df = reconciliation.fuzzy_match_names(
-            attendance_df,
-            cfg.roster,
-            threshold=cfg.fuzzy_match_threshold,
-            low_match_floor=cfg.low_match_floor,
-        )
-        crops = attendance_df["_review_crop"].dropna()
-        print(f"Crop pixel data: {sum(crop.nbytes for crop in crops) / 1024:.1f} KiB")
-        print("Crop shapes:", [crop.shape for crop in crops])
-        print("Name reconciliation finished.")
+        # # --- Stage 7: Reconciliation (clean + fuzzy_match + flag)
+        # print(f"Reconciling {len(attendance_df)} extracted records against the roster...")
+        # reconciled_df = reconciliation.fuzzy_match_names(
+        #     attendance_df,
+        #     cfg.roster,
+        #     threshold=cfg.fuzzy_match_threshold,
+        #     low_match_floor=cfg.low_match_floor,
+        # )
+        # crops = attendance_df["_review_crop"].dropna()
+        # print(f"Crop pixel data: {sum(crop.nbytes for crop in crops) / 1024:.1f} KiB")
+        # print("Crop shapes:", [crop.shape for crop in crops])
+        # print("Name reconciliation finished.")
 
-        # stamp date as the first column
-        reconciled_df.insert(0,'Date', DailyAttendance.sheet_date)
+        # # stamp date as the first column
+        # reconciled_df.insert(0,'Date', daily_attendance.sheet_date)
         
-        return reconciled_df
+        return daily_attendance

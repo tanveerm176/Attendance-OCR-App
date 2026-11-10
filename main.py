@@ -1,72 +1,10 @@
-"""CLI entry point for the attendance OCR pipeline.
+"""Run attendance OCR for a selected folder and export the combined results."""
 
-Responsibilities kept here, deliberately not in pipeline.py:
-- selecting a folder of PDF sign-in sheets
-- concatenating each PDF's pipeline output
-- exporting the combined results to Excel
-"""
-
-    # check_for_update()
-    # 1. parse CLI args
-    #    --input (folder path)
-    #    --roster (file path)
-    #    --output (file path, default: ./output/audit_{date}.xlsx)
-
-    # 2. validate inputs
-    #    - input folder exists
-    #    - input folder contains at least one .pdf
-    #    - roster file exists
-
-    # 3. load roster
-    #    roster = io.roster.load_roster(args.roster)
-
-    # 4. prompt user for batch date
-    #    sheet_date = input("Enter date for this batch (MM/DD/YYYY): ")
-    #    validate format with datetime.strptime — reprompt on invalid input
-
-    # 5. collect and sort PDFs
-    #    pdf_paths = sorted(input_folder.glob("*.pdf"))
-
-    # 6. initialize batch collector
-    #    batch_results = []
-
-    # 7. iterate over PDFs
-    #    for pdf_path in pdf_paths:
-    #        log: processing pdf_path
-    #
-    #        img = pipeline.ingestion.load_pdf(pdf_path)
-    #        img = pipeline.deskew.deskew(img)
-    #        col_positions, row_positions = pipeline.table_detection.detect_boundaries(img)
-    #
-    #        sheet_df = pipeline.ocr.extract_sheet(img, col_positions, row_positions)
-    #        sheet_df = pipeline.reconciliation.clean_names(sheet_df)
-    #        sheet_df = pipeline.reconciliation.fuzzy_match_names(sheet_df, roster)
-    #        sheet_df = pipeline.classification.classify_all(sheet_df, img, col_positions, row_positions)
-    #
-    #        sheet_df['date'] = sheet_date
-    #        sheet_df['source_file'] = pdf_path.name
-    #
-    #        batch_results.append(sheet_df)
-    #        log: completed pdf_path, N rows extracted
-
-    # 8. concatenate batch
-    #    batch_df = pd.concat(batch_results, ignore_index=True)
-
-    # 9. flag low confidence matches
-    #    batch_df = pipeline.reconciliation.flag_low_confidence(batch_df)
-
-    # 10. write Excel output
-    #     io.excel_output.write(batch_df, args.output)
-
-    # 11. print on-screen summary
-    #     reporting.summary.print_summary(batch_df)
-
-    # 12. write log
-    #     reporting.logger.write_log(batch_df, args.output)
 from dotenv import load_dotenv
 load_dotenv()  # populates os.environ from .env, before anything else runs
 
 import time
+import itertools
 import tkinter as tk
 import pandas as pd
 from collections.abc import Callable
@@ -79,9 +17,11 @@ from ocr_pipeline.config import PipelineConfig
 from ocr_pipeline.pipeline import OCRPipeline
 from io_utils.roster_input import build_roster
 from io_utils.excel_output import export_attendance
-from ocr_pipeline.manual_review import REVIEW_CROP_COLUMN, review_flagged_records
+from ocr_pipeline.manual_review import review_flagged_records
+from ocr_pipeline.models import AttendanceBatch, DailyAttendance
 
 def prompt_for_pdf_folder() -> Path:
+    """Ask the user to select the folder containing scanned sign-in sheets."""
     root = tk.Tk()
     root.withdraw()  # hide the empty root window, only show the dialog
 
@@ -97,6 +37,7 @@ def prompt_for_pdf_folder() -> Path:
 
 
 def prompt_for_date() -> str:
+    """Prompt until the user enters a date in MM/DD/YYYY format."""
     while True:
         raw = input("Enter the sign-in sheet date (MM/DD/YYYY): ").strip()
         try:
@@ -107,45 +48,50 @@ def prompt_for_date() -> str:
             print(f"'{raw}' isn't a valid MM/DD/YYYY date — try again.")
 
 
-def process_pdf_folder(
-    folder_path: Path,
-    pipeline: OCRPipeline,
-    review_callback: Callable[[pd.DataFrame], pd.DataFrame] | None = None,
-) -> pd.DataFrame:
-    pdf_paths = sorted(
-        (
-            path
-            for path in folder_path.iterdir()
-            if path.is_file() and path.suffix.casefold() == ".pdf"
-        ),
-        key=lambda path: path.name.casefold(),
-    )
+def process_pdf_folder(folder_path: Path, pipeline: OCRPipeline,
+    review_callback: Callable[[DailyAttendance], None] | None = None) -> AttendanceBatch:
+    """Process PDFs in name order and combine their attendance rows.
+
+    The optional review callback runs on each PDF's results before the next PDF
+    starts. Temporary crop images used by that review step are removed before
+    the per-file dataframes are combined.
+    """
+    # Keep only files with a .pdf extension and process them in a stable,
+    # case-insensitive filename order.
+    pdf_paths = sorted((path 
+                        for path in folder_path.iterdir() 
+                        if path.is_file() and path.suffix.casefold() == ".pdf"), 
+                        key=lambda path: path.name.casefold())
+
     if not pdf_paths:
+        # Fail before processing so an empty selection doesn't reach pd.concat.
         raise ValueError(f"No PDF files found in selected folder: {folder_path}")
 
-    dataframes = []
+    attendance_batch = AttendanceBatch(
+                source_folder=folder_path,
+                attendance_group=None)
+    
     for pdf_path in pdf_paths:
         print(f"Processing {pdf_path.name}...")
-        dataframe = pipeline.run(pdf_path)
+        daily_attendance = pipeline.run(pdf_path)
+        
 
         # Review this PDF before moving on: the pipeline attaches each name crop
         # to its row, and the callback displays flagged rows for roster selection.
 
         if review_callback is not None:
-            dataframe = review_callback(dataframe)
+            review_callback(daily_attendance)
 
         # Crops are only needed by the review UI; keep image arrays out of the
         # combined results and Excel export.
+        
+        attendance_batch.attendance_sheets.append(daily_attendance)
 
-        if REVIEW_CROP_COLUMN in dataframe.columns:
-            dataframe = dataframe.drop(columns=[REVIEW_CROP_COLUMN])
-
-        dataframes.append(dataframe)
-
-    return pd.concat(dataframes, ignore_index=True)
+    return attendance_batch
 
 
 def build_excel_output(folder_path: Path, run_date: date | None = None) -> Path:
+    """Create the output directory and return a dated workbook path for a folder."""
     output_dir = Path("./output")
     output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -154,7 +100,9 @@ def build_excel_output(folder_path: Path, run_date: date | None = None) -> Path:
     filename = f"{folder_path.name}_{run_date.strftime('%m-%d-%Y')}.xlsx"
     return output_dir / filename
 
+
 def main():
+    """Coordinate folder selection, OCR, flagged-name review, and Excel export."""
     folder_path = prompt_for_pdf_folder()
 
     # Start the timer
@@ -164,22 +112,27 @@ def main():
     config = PipelineConfig(roster=roster)
     pipeline = OCRPipeline(config=config)
 
-    df = process_pdf_folder(
+    attendance_batch = process_pdf_folder(
         folder_path,
         pipeline,
         # Reconcile flagged names against the roster in the visual review UI.
-        review_callback=lambda dataframe: review_flagged_records(dataframe, roster)
+        review_callback=lambda attendance: review_flagged_records(attendance, roster)
     )
 
-    pd.set_option('display.max_rows', None)
-    pd.set_option('display.max_colwidth', None)
-    print(df)
+    # Flatten Records
+    # student_records = itertools.chain.from_iterable(sheet.records for sheet in attendance_batch.attendance_sheets)
+    # for record in student_records:
+    #     print(record.match_flag, " ",record.match_score, " ", record.review_crop)
 
-    output_path = build_excel_output(folder_path)
-    export_attendance(df, output_path)
+    # pd.set_option('display.max_rows', None)
+    # pd.set_option('display.max_colwidth', None)
+    # print(df)
+
+    # output_path = build_excel_output(folder_path)
+    # export_attendance(df, output_path)
 
 
-    print(f"Done - {len(df)} rows written to {output_path}")
+    # print(f"Done - {len(df)} rows written to {output_path}")
     # End the timer
     end_time = time.perf_counter()
 

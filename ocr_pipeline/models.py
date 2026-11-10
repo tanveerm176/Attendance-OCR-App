@@ -9,6 +9,7 @@ from ocr_pipeline.constants import REVIEW_FLAGS
 @dataclass
 class AttendanceRecord:
     page_index: int
+    record_index: int
     ocr_name: str
     cleaned_name: str
     matched_name: str | None
@@ -22,7 +23,7 @@ class AttendanceRecord:
 
     @property
     def needs_review(self) -> bool:
-        return self.match_flag in REVIEW_FLAGS and not self.reviewed
+        return self.match_flag in REVIEW_FLAGS and self.reviewed == False
 
 @dataclass
 class DailyAttendance:
@@ -31,3 +32,9 @@ class DailyAttendance:
     # Path written to Excel hyperlinks (e.g. a host path when running Docker)
     source_pdf_display_path: str | None = None
     records: list[AttendanceRecord] = field(default_factory=list)
+
+@dataclass
+class AttendanceBatch:
+    source_folder: Path
+    attendance_group: str | None 
+    attendance_sheets: list[DailyAttendance] = field(default_factory=list)

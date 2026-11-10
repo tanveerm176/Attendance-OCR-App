@@ -10,15 +10,13 @@ import numpy as np
 import pandas as pd
 import tkinter as tk
 from tkinter import ttk
+from ocr_pipeline.models import DailyAttendance, AttendanceRecord
 
-from ocr_pipeline.constants import (
-    LOW_MATCH_LABEL,
-    RESOLVED_MANUALLY_FLAG,
-    REVIEW_FLAGS,
-)
+from ocr_pipeline.constants import RESOLVED_MANUALLY_FLAG
 
-REVIEW_CROP_COLUMN = "_review_crop"
-
+# Signature of a pluggable review UI, used instead of the Tk window (e.g. in tests).
+# Arguments: name crop, flag, OCR text, match score, roster, suggested name.
+# Returns the chosen roster name, or None to skip the record.
 NameSelectionDialog = Callable[
     [np.ndarray, str, str, float, Sequence[str], str | None],
     str | None,
@@ -26,10 +24,19 @@ NameSelectionDialog = Callable[
 
 
 def _encode_preview(image_rgb: np.ndarray, max_width: int = 800, max_height: int = 300) -> str:
+    """Convert an RGB image into a base64 PNG string that Tk can display.
+
+    The image is shrunk, keeping its aspect ratio, to fit within max_width and
+    max_height. Smaller images are never enlarged.
+
+    Raises:
+        ValueError: If the image cannot be encoded as a PNG.
+    """
     # if image_rgb.ndim != 3 or image_rgb.shape[2] != 3 or image_rgb.size == 0:
     #     raise ValueError("Review crop must be a non-empty RGB image")
 
     height, width = image_rgb.shape[:2]
+    # A scale of 1.0 is the cap so small crops are not upscaled.
     scale = min(1.0, max_width / width, max_height / height)
     if scale < 1.0:
         image_rgb = cv2.resize(
@@ -38,6 +45,7 @@ def _encode_preview(image_rgb: np.ndarray, max_width: int = 800, max_height: int
             interpolation=cv2.INTER_AREA,
         )
 
+    # OpenCV's encoder expects BGR channel order, so convert before encoding.
     image_bgr = cv2.cvtColor(image_rgb, cv2.COLOR_RGB2BGR)
     encoded, buffer = cv2.imencode(".png", image_bgr)
     if not encoded:
@@ -46,16 +54,28 @@ def _encode_preview(image_rgb: np.ndarray, max_width: int = 800, max_height: int
     return base64.b64encode(buffer).decode("ascii")
 
 
-def _show_review_queue(
-    dataframe: pd.DataFrame,
-    review_positions: list[int],
-    roster: Sequence[str],
-    *,
-    parent: tk.Tk,
-) -> None:
-    """Review all flagged rows in one window, advancing after each decision."""
+def _show_review_queue(daily_attendance: DailyAttendance, 
+                       review_records: list[AttendanceRecord], 
+                       roster: Sequence[str], 
+                       *, 
+                       parent: tk.Tk) -> None:
+    
+    """Show a single window that steps through each record needing review.
+
+    For every record the operator sees the name crop, the OCR text, the flag and
+    the match score, and either picks a roster name or skips the record. Picking
+    a name updates the record in place (matched_name and match_flag). This
+    function blocks in the Tk main loop until the last record is handled or the
+    window is closed.
+
+    Args:
+        daily_attendance: The sheet the records belong to.
+        review_records: The records to show, in order. Each needs a review crop.
+        roster: Valid student names offered in the dropdown.
+        parent: The Tk root window to build the UI in.
+    """
     parent.title("Review OCR names")
-    parent.resizable(False, False)
+    parent.resizable(True, True)
 
     progress_label = ttk.Label(parent)
     progress_label.pack(padx=12, pady=(12, 4))
@@ -80,62 +100,87 @@ def _show_review_queue(
     )
     name_picker.pack(padx=12, pady=(0, 8))
 
-    current_review = 0
-    confirm_button: ttk.Button
+    # State shared by the nested callbacks below (they rebind it with nonlocal).
+    current_review = 0  # index into review_records of the record on screen
+    confirm_button: ttk.Button  # created after the callbacks that reference it
+    current_photo: tk.PhotoImage | None = None
 
     def update_confirm_state(_event: object = None) -> None:
+        """Enable the confirm button only while a name is selected."""
         confirm_button.configure(state="normal" if selected_name.get() else "disabled")
 
     def show_current_record() -> None:
-        position = review_positions[current_review]
-        flag = str(dataframe.iloc[position]["flag"])
-        ocr_name = str(dataframe.iloc[position]["ocr_raw"])
-        match_score = float(dataframe.iloc[position]["matched_score"])
-        crop = dataframe.iloc[position][REVIEW_CROP_COLUMN]
+        """Fill the window's labels, image and dropdown for the current record."""
+        nonlocal current_photo
+        record = review_records[current_review]
+        flag = record.match_flag
+        ocr_name = record.ocr_name
+        match_score = record.match_score
+        crop = record.review_crop
         if not isinstance(crop, np.ndarray):
-            raise ValueError(f"Missing image crop for OCR review row {position + 1}")
+            raise ValueError(f"Missing image crop for OCR review row {record.record_index}")
 
         progress_label.configure(
-            text=f"Review record {current_review + 1} of {len(review_positions)}"
+            text=f"Review record {current_review + 1} of {len(review_records)}"
         )
         flag_label.configure(text=f"Review required: {flag}")
         ocr_label.configure(text=f"OCR text: {ocr_name or '(empty)'}")
         score_label.configure(text=f"Match score: {match_score:g}")
-        photo = tk.PhotoImage(data=_encode_preview(crop), format="png")
-        image_label.configure(image=photo)
-        image_label.image = photo
-        suggested_name = dataframe.iloc[position]["matched_name"]
+
+        # Tkinter doesn't hold a Python reference to the image, so keep one in the
+        # enclosing scope or it is garbage-collected and the label goes blank.
+        current_photo = tk.PhotoImage(data=_encode_preview(crop), format="png")
+        image_label.configure(image=current_photo)
+
+        # Pre-select the fuzzy-match suggestion so the operator can just confirm it.
+        suggested_name = record.matched_name
         selected_name.set(suggested_name if isinstance(suggested_name, str) else "")
         update_confirm_state()
 
     def advance(selection: str | None = None) -> None:
+        """Apply the operator's choice to the current record and move to the next.
+
+        A selection of None means the record was skipped and is left unchanged.
+        Closes the window after the last record.
+        """
         nonlocal current_review
-        position = review_positions[current_review]
+        record = review_records[current_review]
+
         if selection is not None:
-            dataframe.iat[position, dataframe.columns.get_loc("matched_name")] = selection
-            dataframe.iat[position, dataframe.columns.get_loc("flag")] = (
-                RESOLVED_MANUALLY_FLAG
-            )
+            record.matched_name = selection
+            record.match_flag = RESOLVED_MANUALLY_FLAG
+            record.reviewed = True
+            record.review_crop = None
 
         current_review += 1
-        if current_review == len(review_positions):
+
+        if current_review == len(review_records):
+            # quit() only stops the main loop; the caller destroys the window.
             parent.quit()
             return
+        
         show_current_record()
 
     def confirm() -> None:
+        """Accept the dropdown choice, but only if it is a valid roster name."""
         if selected_name.get() in roster:
             advance(selected_name.get())
 
     buttons = ttk.Frame(parent)
     buttons.pack(fill="x", padx=12, pady=(0, 12))
+
     ttk.Button(buttons, text="Skip", command=lambda: advance()).pack(side="right")
     confirm_button = ttk.Button(buttons, text="Use selected name", command=confirm)
+
     confirm_button.pack(side="right", padx=(0, 8))
     name_picker.bind("<<ComboboxSelected>>", update_confirm_state)
+
+    # Closing the window with the X ends the review; remaining records are left unchanged.
     parent.protocol("WM_DELETE_WINDOW", parent.quit)
     name_picker.focus_set()
     show_current_record()
+
+    # Bring the window to the front so it isn't hidden behind other apps.
     parent.update_idletasks()
     parent.deiconify()
     parent.lift()
@@ -143,73 +188,87 @@ def _show_review_queue(
     parent.mainloop()
 
 
-def review_flagged_records(
-    dataframe: pd.DataFrame,
-    roster: Sequence[str],
-    *,
-    dialog: NameSelectionDialog | None = None,
-) -> pd.DataFrame:
-    """Review flagged rows and apply confirmed roster choices to a copy."""
-    required_columns = {"flag", "ocr_raw", "matched_name", "matched_score", REVIEW_CROP_COLUMN}
-    missing_columns = required_columns.difference(dataframe.columns)
-    if missing_columns:
-        raise ValueError(
-            f"Attendance data is missing review columns: {sorted(missing_columns)}"
-        )
+def review_flagged_records(daily_attendance: DailyAttendance, 
+                           roster: Sequence[str], 
+                           *, 
+                           dialog: NameSelectionDialog | None = None) -> None:
+    """Let an operator resolve the records on a sheet that were flagged for review.
 
-    reviewed = dataframe.copy()
-    flag_column = reviewed.columns.get_loc("flag")
-    ocr_column = reviewed.columns.get_loc("ocr_raw")
-    name_column = reviewed.columns.get_loc("matched_name")
-    score_column = reviewed.columns.get_loc("matched_score")
-    crop_column = reviewed.columns.get_loc(REVIEW_CROP_COLUMN)
+    Records are updated in place: a confirmed choice sets matched_name and
+    sets match_flag to RESOLVED_MANUALLY_FLAG. Skipped records are unchanged.
 
-    review_positions = [
-        position
-        for position in range(len(reviewed))
-        if reviewed.iat[position, flag_column] in REVIEW_FLAGS
-    ]
+    Args:
+        daily_attendance: The sheet whose records are reviewed.
+        roster: Valid student names the operator may choose from.
+        dialog: Optional replacement for the Tk window. It is called once per
+            record and returns the chosen name or None to skip.
 
-    if not review_positions:
+    Raises:
+        ValueError: If the roster is empty, a flagged record has no image crop,
+            or a dialog returns a name that is not in the roster.
+    """
+    # Create list of records that are flagged for review
+    # needs_review is True for flagged records that haven't been resolved yet
+    review_records = [student_record
+                        for student_record in daily_attendance.records 
+                        if student_record.needs_review]
+
+    if not review_records:
         print("Name reconciliation complete: no records need manual review.")
-        return reviewed
+        return None
 
-    print(f"Name reconciliation complete: {len(review_positions)} records need review.")
+    print(f"Name reconciliation complete: {len(review_records)} records need review.")
+
     if dialog is None:
         if not roster:
             raise ValueError("Cannot review flagged OCR names with an empty roster")
-        for position in review_positions:
-            if not isinstance(reviewed.iat[position, crop_column], np.ndarray):
-                raise ValueError(f"Missing image crop for OCR review row {position + 1}")
+        
+        # Fail up front rather than partway through the review session.
+        for record in review_records:
+            if not isinstance(record.review_crop, np.ndarray):
+                raise ValueError(f"Missing image crop for OCR review row {record.record_index}")
+            
         root = tk.Tk()
+
         try:
-            _show_review_queue(reviewed, review_positions, roster, parent=root)
-            return reviewed
+            _show_review_queue(daily_attendance, review_records, roster, parent=root)
+            return None
+        
         finally:
+            # Always release the Tk window, even if the review raises.
             root.destroy()
 
-    for review_number, position in enumerate(review_positions, start=1):
-        flag = reviewed.iat[position, flag_column]
-        crop = reviewed.iat[position, crop_column]
-        if not isinstance(crop, np.ndarray):
-            raise ValueError(f"Missing image crop for OCR review row {position + 1}")
+    # Custom dialog path (not yet migrated to DailyAttendance records).
+    for record in review_records:
+        flag = record.match_flag
+        crop = record.review_crop
 
-        score = reviewed.iat[position, score_column]
-        print(f"Reviewing record {review_number} of {len(review_positions)} ({flag}).")
+        if not isinstance(crop, np.ndarray):
+            raise ValueError(f"Missing image crop for OCR review row {record.record_index}")
+
+        score = record.match_score
+        print(f"Reviewing record {record.record_index} of {len(review_records)} ({flag}).")
+
         selection = dialog(
             crop,
             str(flag),
-            str(reviewed.iat[position, ocr_column]),
+            record.ocr_name,
             float(score),
             roster,
-            reviewed.iat[position, name_column],
+            record.matched_name,
         )
+
         if selection is None:
             continue
+
         if selection not in roster:
             raise ValueError(f"Selected name is not present in the roster: {selection}")
 
-        reviewed.iat[position, name_column] = selection
-        reviewed.iat[position, flag_column] = RESOLVED_MANUALLY_FLAG
+        record.matched_name = selection
+        record.match_flag = RESOLVED_MANUALLY_FLAG
 
-    return reviewed
+        # drop crop after review and set reviewed to True
+        record.review_crop = None
+        record.reviewed = True
+
+    return None

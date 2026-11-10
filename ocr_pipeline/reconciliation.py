@@ -52,7 +52,8 @@ def fuzzy_match_names(df: pd.DataFrame, roster: list[str], name_col: str = "ocr_
 
 def match_name(raw_name: str, attendance_status: str | None, roster: list[str], 
                threshold: int, low_match_floor: int) -> tuple[str, str | None, float, str]:
-    """Clean one OCR name, match it against the roster, and return its flag."""
+    """Clean one OCR name, match it against the roster, and return its flag.
+    cleaned_name, matched_name, score, flag """
     cleaned_name = clean_ocr_name(raw_name)
 
     # Handwritten-name regions are handled manually instead of roster matching.
