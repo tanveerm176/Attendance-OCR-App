@@ -1,26 +1,55 @@
 from datetime import date
 from pathlib import Path
 
-import pandas as pd
+import numpy as np
 import pytest
 
 from main import build_excel_output, process_pdf_folder
+from ocr_pipeline.models import AttendanceBatch, AttendanceRecord, DailyAttendance
 
 
 class FakePipeline:
-    def run(self, pdf_path: Path) -> pd.DataFrame:
-        return pd.DataFrame({"source": [pdf_path.name]})
+    def __init__(self):
+        self.sheets = []
+        self.events = []
+
+    def run(self, pdf_path: Path) -> DailyAttendance:
+        self.events.append(("process", pdf_path.name))
+        record = AttendanceRecord(
+            page_index=0,
+            record_index=1,
+            ocr_name=pdf_path.stem,
+            cleaned_name=pdf_path.stem,
+            matched_name=None,
+            match_score=0.0,
+            match_flag="NoMatchFoundError",
+            attendance_status="Present",
+            review_crop=np.ones((2, 2), dtype=np.uint8),
+        )
+        sheet = DailyAttendance(source_pdf=pdf_path, records=[record])
+        self.sheets.append(sheet)
+        return sheet
 
 
-def test_process_pdf_folder_concatenates_pdf_results_in_filename_order(tmp_path):
+def test_process_pdf_folder_collects_sheets_in_filename_order(tmp_path):
     (tmp_path / "b.pdf").touch()
     (tmp_path / "A.PDF").touch()
     (tmp_path / "ignore.txt").touch()
+    pipeline = FakePipeline()
 
-    result = process_pdf_folder(tmp_path, FakePipeline())
+    result = process_pdf_folder(tmp_path, pipeline)
 
-    assert result["source"].tolist() == ["A.PDF", "b.pdf"]
-    assert result.index.tolist() == [0, 1]
+    assert isinstance(result, AttendanceBatch)
+    assert result.source_folder == tmp_path
+    assert result.attendance_group is None
+    assert [sheet.source_pdf.name for sheet in result.attendance_sheets] == [
+        "A.PDF", "b.pdf"
+    ]
+    assert all(
+        actual is expected
+        for actual, expected in zip(result.attendance_sheets, pipeline.sheets)
+    )
+    assert all(sheet.records[0].review_crop is not None for sheet in result.attendance_sheets)
 
 
 def test_process_pdf_folder_raises_when_folder_has_no_pdfs(tmp_path):
@@ -28,42 +57,31 @@ def test_process_pdf_folder_raises_when_folder_has_no_pdfs(tmp_path):
         process_pdf_folder(tmp_path, FakePipeline())
 
 
-def test_process_pdf_folder_applies_review_to_each_pdf(tmp_path):
+def test_process_pdf_folder_reviews_each_sheet_in_place_before_next_pdf(tmp_path):
     (tmp_path / "a.pdf").touch()
     (tmp_path / "b.pdf").touch()
-    reviewed_files = []
+    pipeline = FakePipeline()
 
-    def review(dataframe):
-        reviewed_files.extend(dataframe["source"].tolist())
-        dataframe["reviewed"] = True
-        return dataframe
+    def review(sheet: DailyAttendance) -> None:
+        pipeline.events.append(("review", sheet.source_pdf.name))
+        record = sheet.records[0]
+        assert record.review_crop is not None
+        record.matched_name = "Student"
+        record.match_flag = "Resolved - Manual Review"
+        record.reviewed = True
+        record.review_crop = None
 
-    result = process_pdf_folder(tmp_path, FakePipeline(), review_callback=review)
+    result = process_pdf_folder(tmp_path, pipeline, review_callback=review)
 
-    assert reviewed_files == ["a.pdf", "b.pdf"]
-    assert result["reviewed"].tolist() == [True, True]
-
-
-def test_process_pdf_folder_removes_internal_review_crops(tmp_path):
-    (tmp_path / "a.pdf").touch()
-
-    class PipelineWithReviewCrop:
-        def run(self, pdf_path: Path) -> pd.DataFrame:
-            return pd.DataFrame(
-                {"source": [pdf_path.name], "_review_crop": [object()]}
-            )
-
-    def review(dataframe):
-        assert "_review_crop" in dataframe.columns
-        return dataframe
-
-    result = process_pdf_folder(
-        tmp_path,
-        PipelineWithReviewCrop(),
-        review_callback=review,
-    )
-
-    assert "_review_crop" not in result.columns
+    assert pipeline.events == [
+        ("process", "a.pdf"), ("review", "a.pdf"),
+        ("process", "b.pdf"), ("review", "b.pdf"),
+    ]
+    for sheet, original in zip(result.attendance_sheets, pipeline.sheets):
+        assert sheet is original
+        assert sheet.records[0].matched_name == "Student"
+        assert sheet.records[0].reviewed is True
+        assert sheet.records[0].review_crop is None
 
 
 def test_build_excel_output_uses_folder_and_current_date(tmp_path, monkeypatch):
