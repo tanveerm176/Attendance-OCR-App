@@ -53,8 +53,7 @@ def process_pdf_folder(folder_path: Path, pipeline: OCRPipeline,
     """Process PDFs in name order and combine their attendance rows.
 
     The optional review callback runs on each PDF's results before the next PDF
-    starts. Temporary crop images used by that review step are removed before
-    the per-file dataframes are combined.
+    starts. Review decisions update the sheets in place.
     """
     # Keep only files with a .pdf extension and process them in a stable,
     # case-insensitive filename order.
@@ -64,7 +63,6 @@ def process_pdf_folder(folder_path: Path, pipeline: OCRPipeline,
                         key=lambda path: path.name.casefold())
 
     if not pdf_paths:
-        # Fail before processing so an empty selection doesn't reach pd.concat.
         raise ValueError(f"No PDF files found in selected folder: {folder_path}")
 
     attendance_batch = AttendanceBatch(
@@ -82,9 +80,6 @@ def process_pdf_folder(folder_path: Path, pipeline: OCRPipeline,
         if review_callback is not None:
             review_callback(daily_attendance)
 
-        # Crops are only needed by the review UI; keep image arrays out of the
-        # combined results and Excel export.
-        
         attendance_batch.attendance_sheets.append(daily_attendance)
 
     return attendance_batch

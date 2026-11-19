@@ -1,181 +1,68 @@
 # Models Integration Plan
 
-This plan replaces DataFrame hand-offs between pipeline stages with the dataclasses in `ocr_pipeline/models.py`. Records and sheets carry the data through the run, and DataFrames exist only inside the Excel exporter. A database writer is deferred; it can be added later as a sibling of `io_utils/excel_output.py`.
+## Status
 
-## Goals
+The pipeline, manual review, batch entry points, and Excel export now pass
+dataclasses rather than DataFrames between stages. This document records the
+implemented behavior and the remaining work; the original plan's proposed
+design is not complete in every respect.
 
-- Pass typed objects (`DailyAttendance`, `AttendanceRecord`) between stages instead of DataFrames.
-- Reduce memory: keep image crops only for records that need manual review.
-- Remove shared mutable state (`DailySheet.sheet_date` is currently written on the class, so one PDF's date can leak into the next).
-- Keep Tkinter out of the models, the batch workflow, and anything the headless Docker image imports.
+## Implemented
 
-## Non-goals (for now)
+- `ocr_pipeline/models.py` defines `AttendanceRecord`, `DailyAttendance`, and
+  `AttendanceBatch`. A batch owns an ordered list of sheets, each sheet owns
+  its records, and each record carries page and record indexes, OCR text,
+  attendance, match details, and review state. Dates are stored per sheet and
+  may be `None`. `source_pdf_display_path` allows the headless workflow to
+  preserve a host-visible path separately from the input PDF path.
+- `review_crop` is excluded from dataclass equality and representation.
+  `needs_review` depends on the review flags and the `reviewed` field.
+- `ocr_pipeline/constants.py` centralizes the match and review flags.
+  `reconciliation.match_name` reconciles one row at a time; the older
+  `fuzzy_match_names` DataFrame wrapper is still present and tested.
+- `OCRPipeline.run` returns `DailyAttendance`. It matches each normal row
+  immediately, validates its attendance status, and copies a grayscale crop
+  only for a review flag. Handwritten detections become separate flagged
+  records with a copied RGB crop. The sheet date is local to each run.
+- Manual review mutates the selected records in place. A confirmed choice
+  updates the name, sets the flag to `Resolved - Manual Review`, marks the
+  record reviewed, and clears its crop. A skipped record keeps its flag and
+  crop for later review. The callback remains injectable.
+- The desktop and headless workflows each implement PDF discovery and return
+  an `AttendanceBatch`. Desktop review runs between PDFs; the headless workflow
+  clears review crops and sets host-visible paths without invoking the GUI.
+- `export_attendance` accepts a batch and builds its DataFrame internally from
+  column lists. It maps the model fields to the existing workbook headers,
+  groups and formats rows by date, rejects empty data or missing dates, and
+  writes source hyperlinks when display paths are supplied. Crop arrays are
+  not exported.
+- Model-based export, review, desktop and headless tests cover these hand-offs.
+  Pipeline tests exercise per-run dates, record ordering, normal and
+  handwritten review crops, and array-safe model equality.
 
-- Database export.
-- New subpackages (`stages/`, `application/`) or a `src/` layout.
-- Changing Docker, `pyproject.toml` packaging, or `main.spec`. All new code stays in `ocr_pipeline/` and `io_utils/`, which are already copied and packaged.
+See [OCR_DATA_FLOW.md](./OCR_DATA_FLOW.md) for the current processing flow.
 
-## Target `models.py`
+## Remaining work and deviations
 
-```python
-from dataclasses import dataclass, field
-from datetime import datetime
-from pathlib import Path
-from typing import Literal
-
-import numpy as np
-
-from ocr_pipeline.constants import REVIEW_FLAGS
-
-
-@dataclass
-class AttendanceRecord:
-    page_index: int
-    ocr_name: str
-    cleaned_name: str
-    matched_name: str | None
-    match_score: float
-    match_flag: str
-    attendance_status: Literal["Present", "Absent", "EMPTY CELL"]
-    is_handwritten: bool = False
-    reviewed: bool = False
-    # Kept for unresolved records that still need manual review.
-    review_crop: np.ndarray | None = field(default=None, repr=False, compare=False)
-
-    @property
-    def needs_review(self) -> bool:
-        return self.match_flag in REVIEW_FLAGS and not self.reviewed
-
-
-@dataclass
-class DailyAttendance:
-    source_pdf: Path
-    sheet_date: datetime | None = None
-    # Path written to Excel hyperlinks (e.g. a host path when running in Docker).
-    source_pdf_display_path: str | None = None
-    records: list[AttendanceRecord] = field(default_factory=list)
-```
-
-Design notes:
-
-- `review_crop` uses `repr=False, compare=False`. Dataclass `==` on NumPy arrays raises `ValueError` (ambiguous truth value), and printing pixel data is expensive.
-- Records are mutable because manual review updates `matched_name`, `match_flag`, and `reviewed`.
-- `sheet_date` is optional so a missing or unparseable date is an explicit state.
-- `source_pdf_display_path` keeps the container path separate from the path shown to users (`--source-path-root`).
-- `reviewed` preserves the original `match_flag` after a manual decision. The exporter writes `Resolved - Manual Review` for reviewed records instead of overwriting the flag.
-- Per-page dates are not modeled. If a single PDF can contain pages with different dates, add `sheet_date` to a page-level object later.
-
-Open naming decision: the current DataFrame columns are `ocr_raw`, `matched_score`, `flag`, `attendance`. The model uses `ocr_name`, `match_score`, `match_flag`, `attendance_status`. Use the model names everywhere in code and map to the existing Excel headers in one place (`OUTPUT_COLUMNS` in `io_utils/excel_output.py`).
-
-## Shared constants
-
-Create `ocr_pipeline/constants.py` (required, so `models.py` can import `REVIEW_FLAGS` without an import cycle) with the flag values currently scattered across modules:
-
-- `STRONG_MATCH_LABEL`, `LOW_MATCH_LABEL`, `EMPTY_ROW_LABEL`, `RESOLVED_MANUALLY_FLAG`
-- `NEED_MANUAL_ENTRY_FLAG = "NEED-MANUAL-ENTRY"`
-- `WRITTEN_NAME_MARKER = "WRITTEN NAME DETECTED"`
-- `REVIEW_FLAGS`: the set of flags that require review (`OCRExtractionError`, `NoMatchFoundError`, `LOW_MATCH_LABEL`, `NEED-MANUAL-ENTRY`). Currently defined in `manual_review.py`.
-
-`EMPTY CELL` and `Strong Match` do not require review, so they never keep a crop.
-
-## Memory strategy
-
-Most of the saving comes from reconciling each record immediately, not from the model shape alone.
-
-1. **Reconcile per record, right after OCR.** Match each name inside the row loop so the flag is known immediately. Store the crop only when `match_flag in REVIEW_FLAGS`; otherwise drop it.
-2. **Handwritten regions follow the same rule.** They are always `NEED-MANUAL-ENTRY`, so their crops are kept for review.
-3. **Always `.copy()` a kept crop.** A NumPy slice is a view that keeps the whole table image alive. This includes the handwritten crop, which currently holds `written_names.copy()` only for the review list.
-4. **Store grayscale crops.** The handwritten crop is currently RGB (three times the size). The review UI converts for display.
-5. **Clear after resolution only.** Set `review_crop = None` and `reviewed = True` once a record is resolved. Skipping leaves `reviewed = False` and keeps the crop so the record remains reviewable in a later pass.
-6. **Render pages lazily.** Add `iter_pdf_pages(pdf_path)` to `ocr_pipeline/ingestion.py` as a generator so only one full-page image exists at a time. Keep `pdf_to_image()` as a list wrapper so `tests/test_ingestion.py` keeps passing.
-
-Expected peak memory: one page image plus that page's table crops, plus a handful of small review crops, rather than every crop for the whole PDF.
-
-## Integration steps
-
-Each step should be its own commit, with the test suite passing after each one.
-
-### 1. Update `models.py` and add constants
-
-- Replace `models.py` with the target above.
-- Add the shared constants and import them from `reconciliation.py` and `manual_review.py`.
-- Remove the duplicate `LOW_MATCH_SCORE_FLOOR` in `reconciliation.py`; `PipelineConfig.low_match_floor` is the single source of truth.
-
-### 2. Make reconciliation per-record
-
-- Add `match_name(raw_name, attendance_status, roster, threshold, low_match_floor)` in `reconciliation.py`. It returns the cleaned name, matched name, score, and flag.
-- Preserve existing behavior: the handwritten marker returns `NEED-MANUAL-ENTRY`; a blank name in an `EMPTY CELL` row returns `EMPTY CELL`; blank or very short names return `OCRExtractionError`; an empty roster result returns `NoMatchFoundError`.
-- Keep `fuzzy_match_names(df, ...)` as a thin wrapper that calls `match_name` until its callers and tests are migrated; remove it at the end.
-
-### 3. Convert `OCRPipeline.run` to return `DailyAttendance`
-
-- Build one `AttendanceRecord` per row (replaces the parallel `ocr_names`, `attendance_statuses`, and `review_crops` lists, which could fall out of step).
-- Call `match_name` per row and keep the crop only for review flags.
-- Replace `DailySheet.sheet_date = ...` with a local `sheet_date`, and return it on `DailyAttendance`. Policy for PDFs where no date is detected : prompt the user to enter a date from a GUI
-- Remove unused imports (`matplotlib`, `mpimg`, `rotate`) and drop `matplotlib` from `pyproject.toml` if nothing else uses it.
-- Optionally switch the page loop to `ingestion.iter_pdf_pages`.
-
-### 4. Convert manual review
-
-- `review_flagged_records` takes and returns `list[AttendanceRecord]` (or a `DailyAttendance`), selecting records with `record.needs_review`.
-- Replace positional `iat` lookups with attribute access.
-- On confirmation set `matched_name`, `reviewed = True`, and `review_crop = None`.
-- Keep the injectable `dialog` parameter used by tests. Tkinter stays in this module for now.
-
-### 5. Add the shared batch workflow
-
-- Create `ocr_pipeline/batch.py` with a function such as `process_pdf_folder(folder, pipeline, *, review_callback=None, source_path_root=None) -> list[DailyAttendance]`.
-- It handles PDF discovery (case-insensitive sort), running the pipeline, the optional review callback, and setting `source_pdf_display_path`.
-- It must not import Tkinter or `manual_review`; review is passed in as a callback so the headless image keeps working.
-- `main.py` supplies the folder picker and review callback; `ocr_pipeline/batch_cli.py` supplies argparse and no review. Keep `batch_cli.main` in place so the `attendance-ocr-batch` entry point is unchanged.
-
-### 6. Update the Excel exporter
-
-- `export_attendance` accepts `list[DailyAttendance]` and flattens it to a DataFrame internally, so formatting code is unchanged.
-- Map model fields to the existing output headers in `OUTPUT_COLUMNS`.
-- Write `Resolved - Manual Review` for reviewed records.
-- Keep the existing validation (missing date, empty data).
-
-### 7. Update tests and docs
-
-- Update tests that build DataFrames: `test_reconciliation.py`, `test_manual_review.py`, `test_batch_cli.py`, `test_main_batch.py`, `test_excel_output.py`.
-- Add tests for: crops kept only for review flags, handwritten records keep crops, crops cleared after review, per-PDF dates not leaking between PDFs, and `DailyAttendance == DailyAttendance` not raising.
-- Update `docs/OCR_DATA_FLOW.md` (its DataFrame flow and memory notes) and `docs/PROJECT_STRUCTURE.md`, which is already out of date.
-
-## Docker and packaging checks
-
-No Dockerfile or packaging change is required, since everything stays in `ocr_pipeline/` and `io_utils/`. After step 5 and again at the end:
-
-```powershell
-docker build -t attendance-ocr:local .
-docker run --rm attendance-ocr:local --help
-```
-
-The headless image does not install Tkinter, so confirm nothing imported by `batch.py` or `batch_cli.py` pulls in `manual_review` at import time.
-
-## Risks and things to watch
-
-- **Behavior parity.** The per-record reconciliation must produce the same flags and scores as `fuzzy_match_names` for the same inputs; port the existing tests first.
-- **Date policy.** Today a missing date silently reuses the previous PDF's date. After the change the date may be `None`, so the exporter and batch loop need an explicit decision.
-- **Crop views.** Forgetting `.copy()` on a kept crop pins an entire page image in memory and defeats the optimization.
-- **Roster-dependent review.** The review dialog needs the roster; pass it from the caller rather than storing it on records.
-
-## Additional model guidance
-
-- **Validate status values.** `Literal` is only checked by a type checker, and the classifier returns plain strings. Add a test asserting the attendance classifier only returns `Present`, `Absent`, or `EMPTY CELL` (or switch to an `AttendanceStatus(str, Enum)` later).
-- **`reviewed` vs `match_flag`.** Rule: the original `match_flag` is never overwritten. The exporter derives the final flag from `reviewed` (`Resolved - Manual Review`), and row highlighting must key on that final flag, so reviewed records lose the gold highlight.
-- **Skipped records.** Skipping leaves `reviewed = False` and keeps the crop. The record remains `needs_review` and can be offered again in a later review pass. Never use `review_crop is None` to decide whether review is needed; use `needs_review`.
-- **Keep models plain data.** Do not store the roster, config, Tkinter objects, or DataFrames on them.
-- **`datetime` only.** `sheet_date` stays a `datetime` (midnight); mixing in `date` objects breaks the exporter's grouping.
-- **Row order.** Export relies on records staying in sheet order; review must not reorder them.
-- **`page_index`.** Informational for now; usable later as a "source page" column.
-- **Database later.** Write an explicit record-to-row conversion that skips `review_crop`. `dataclasses.asdict` deep-copies NumPy arrays.
-- **Test factory.** Add a record builder fixture in `tests/conftest.py` so tests don't repeat every field.
-- **Multiprocessing.** If PDFs are ever processed in parallel, crops are pickled; the memory strategy keeps this small.
-- **Not needed yet:** a `ReviewDecision` object, per-page models, or a flag enum.
-
-## Future work (not in this plan)
-
-- Database writer alongside `excel_output` (choice of database undecided).
-- Per-page date or page-level models if a PDF can mix dates.
-- Moving `manual_review.py` out of `ocr_pipeline/` once a second UI exists.
+- **Shared batch workflow:** desktop and CLI discovery remain separate; the
+  proposed `ocr_pipeline/batch.py` has not been introduced.
+- **Date policy:** a missing date remains `None` and export raises an error.
+  The planned GUI prompt for a missing date has not been implemented.
+- **Memory:** `pdf_to_image` still renders all pages into a list. A lazy page
+  iterator and grayscale handwritten crops remain future improvements.
+  Skipped desktop-review crops stay on their records; the headless workflow
+  discards crops because it does not offer interactive review.
+- **Review flag history:** the implementation replaces the original flag upon
+  confirmation rather than preserving it and deriving the exported flag from
+  `reviewed`. Changing this requires a deliberate behavior decision.
+- **Compatibility and cleanup:** the DataFrame reconciliation wrapper remains;
+  commented legacy code and unused imports remain in the pipeline/exporter.
+  `matplotlib` is still declared and imported.
+- **Documentation:** `PROJECT_STRUCTURE.md` has broader pre-existing
+  inaccuracies and needs a separate refresh.
+- **Headless packaging:** verify the Docker image and CLI in an environment
+  with Docker before claiming packaging validation. The batch entry point must
+  remain independent of Tkinter and the manual-review module.
+- **Future capabilities:** database export and per-page dates remain out of
+  scope. If PDFs can contain mixed dates, introduce a page-level date model
+  before relying on one date per PDF.

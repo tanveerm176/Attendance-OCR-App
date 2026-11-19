@@ -61,6 +61,12 @@ def export_attendance(attendance_batch: AttendanceBatch, output_path: Path) -> N
     "flag": [],
     "attendance": [],
     }
+    include_source_paths = any(
+        sheet.source_pdf_display_path is not None
+        for sheet in attendance_batch.attendance_sheets
+    )
+    if include_source_paths:
+        columns[SOURCE_PDF_PATH_COLUMN] = []
 
     for sheet in attendance_batch.attendance_sheets:
         for record in sheet.records:
@@ -71,6 +77,10 @@ def export_attendance(attendance_batch: AttendanceBatch, output_path: Path) -> N
             columns["matched_score"].append(record.match_score)
             columns["flag"].append(record.match_flag)
             columns["attendance"].append(record.attendance_status)
+            if include_source_paths:
+                columns[SOURCE_PDF_PATH_COLUMN].append(
+                    sheet.source_pdf_display_path or str(sheet.source_pdf.resolve())
+                )
 
     df = pd.DataFrame(columns)
 

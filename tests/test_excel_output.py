@@ -1,39 +1,53 @@
 from datetime import datetime
 from pathlib import Path
 
-import pandas as pd
 import pytest
 from openpyxl import load_workbook
 
 from io_utils.excel_output import export_attendance
+from ocr_pipeline.models import AttendanceBatch, AttendanceRecord, DailyAttendance
+
+
+def make_record(name, attendance="Present", cleaned=None, matched=None,
+                score=100.0, flag="Strong Match"):
+    return AttendanceRecord(
+        page_index=0,
+        record_index=1,
+        ocr_name=name,
+        cleaned_name=cleaned if cleaned is not None else name,
+        matched_name=matched,
+        match_score=score,
+        match_flag=flag,
+        attendance_status=attendance,
+    )
 
 
 def test_export_attendance_creates_date_sheets_and_formats_date_column(tmp_path):
     output_path = tmp_path / "attendance.xlsx"
-    dataframe = pd.DataFrame(
-        {
-            "Date": [
-                datetime(2026, 10, 2),
-                datetime(2026, 9, 15),
-                datetime(2026, 10, 2, 15, 30),
-                datetime(2026, 10, 2),
-            ],
-            "ocr_raw": ["A", "B", "An exceptionally long OCR name", "Write-in\nname"],
-            "attendance": ["Present", "Absent", "Present", "Present"],
-            "cleaned_name": ["A", "B", "An exceptionally long cleaned name", "Write-in name"],
-            "matched_name": ["Student A", "Student B", "Student C", "Student D"],
-            "matched_score": [100.0, 100.0, 82.5, 0.0],
-            "flag": [
-                "Strong Match",
-                "Strong Match",
-                "Low Match - Needs Review",
-                "NEED-MANUAL-ENTRY",
-            ],
-            "_review_crop": [None, None, None, None],
-        }
+    batch = AttendanceBatch(
+        source_folder=tmp_path,
+        attendance_group=None,
+        attendance_sheets=[
+            DailyAttendance(tmp_path / "a.pdf", datetime(2026, 10, 2), records=[
+                make_record("A", matched="Student A"),
+            ]),
+            DailyAttendance(tmp_path / "b.pdf", datetime(2026, 9, 15), records=[
+                make_record("B", attendance="Absent", matched="Student B"),
+            ]),
+            DailyAttendance(tmp_path / "c.pdf", datetime(2026, 10, 2, 15, 30), records=[
+                make_record("An exceptionally long OCR name",
+                            cleaned="An exceptionally long cleaned name",
+                            matched="Student C", score=82.5,
+                            flag="Low Match - Needs Review"),
+            ]),
+            DailyAttendance(tmp_path / "d.pdf", datetime(2026, 10, 2), records=[
+                make_record("Write-in\nname", cleaned="Write-in name",
+                            matched="Student D", score=0.0, flag="NEED-MANUAL-ENTRY"),
+            ]),
+        ],
     )
 
-    export_attendance(dataframe, output_path)
+    export_attendance(batch, output_path)
 
     workbook = load_workbook(output_path, data_only=False)
     assert workbook.sheetnames == ["09-15-2026", "10-02-2026"]
@@ -61,6 +75,9 @@ def test_export_attendance_creates_date_sheets_and_formats_date_column(tmp_path)
     assert workbook["10-02-2026"]["A2"].number_format == "MM/DD/YYYY"
     assert workbook["10-02-2026"]["A3"].number_format == "MM/DD/YYYY"
     worksheet = workbook["10-02-2026"]
+    assert [worksheet.cell(row=row, column=6).value for row in (2, 3, 4)] == [
+        100.0, 82.5, 0.0
+    ]
     assert worksheet["A1"].alignment.horizontal == "center"
     assert worksheet["A2"].alignment.horizontal == "center"
     assert worksheet["A1"].font.bold is True
@@ -83,25 +100,17 @@ def test_export_attendance_creates_date_sheets_and_formats_date_column(tmp_path)
     assert worksheet.row_dimensions[4].height is None
 
 
-@pytest.mark.parametrize(
-    "dataframe, message",
-    [
-        (pd.DataFrame({"Student": ["A"]}), "must contain a 'Date' column"),
-        (pd.DataFrame({"Date": [datetime(2026, 10, 2)], "Student": ["A"]}).iloc[0:0], "empty"),
-        (
-            pd.DataFrame({
-                "Date": [None],
-                "ocr_raw": ["A"],
-                "attendance": ["Present"],
-                "cleaned_name": ["A"],
-                "matched_name": ["Student A"],
-                "matched_score": [100],
-                "flag": ["Strong Match"],
-            }),
-            "without a date",
-        ),
-    ],
-)
-def test_export_attendance_rejects_invalid_data(tmp_path, dataframe, message):
-    with pytest.raises(ValueError, match=message):
-        export_attendance(dataframe, tmp_path / "attendance.xlsx")
+def test_export_attendance_rejects_empty_batch(tmp_path):
+    batch = AttendanceBatch(source_folder=tmp_path, attendance_group=None)
+    with pytest.raises(ValueError, match="empty"):
+        export_attendance(batch, tmp_path / "attendance.xlsx")
+
+
+def test_export_attendance_rejects_missing_sheet_date(tmp_path):
+    batch = AttendanceBatch(
+        source_folder=tmp_path,
+        attendance_group=None,
+        attendance_sheets=[DailyAttendance(tmp_path / "sheet.pdf", records=[make_record("A")])],
+    )
+    with pytest.raises(ValueError, match="without a date"):
+        export_attendance(batch, tmp_path / "attendance.xlsx")

@@ -6,7 +6,6 @@ import argparse
 from pathlib import Path, PurePosixPath, PureWindowsPath
 from collections.abc import Sequence
 
-import pandas as pd
 from dotenv import load_dotenv
 
 from io_utils.excel_output import export_attendance
@@ -16,9 +15,7 @@ from ocr_pipeline.config import PipelineConfig
 load_dotenv()
 
 from ocr_pipeline.pipeline import OCRPipeline
-from ocr_pipeline.models import AttendanceBatch, DailyAttendance, AttendanceRecord
-
-REVIEW_CROP_COLUMN = "_review_crop"
+from ocr_pipeline.models import AttendanceBatch
 
 
 def _source_pdf_path(
@@ -52,11 +49,10 @@ def process_pdf_folder(
     *,
     source_path_root: str | None = None,
 ) -> AttendanceBatch:
-    """Run OCR on each PDF in a folder and combine the per-file dataframes.
+    """Run OCR on each PDF in a folder and collect the resulting sheets.
 
-    PDFs are processed in case-insensitive filename order. Internal review
-    crops and any source path supplied by the pipeline are removed before the
-    selected source path is attached to each row.
+    PDFs are processed in case-insensitive filename order. Review crops are
+    discarded and the selected source path is attached to each sheet.
 
     Args:
         folder_path: Directory containing the PDF attendance sheets.
@@ -65,7 +61,7 @@ def process_pdf_folder(
             omitted, each PDF's resolved local path is used.
 
     Returns:
-        A single dataframe containing all processed PDF rows.
+        A batch containing all processed sheets.
 
     Raises:
         ValueError: If the input directory does not exist or contains no PDFs.
@@ -94,14 +90,12 @@ def process_pdf_folder(
     for pdf_path in pdf_paths:
         print(f"Processing {pdf_path.name}...")
 
-        # Work on a copy so adding batch metadata doesn't mutate pipeline output.
         daily_attendance = pipeline.run(pdf_path)
 
         # Image crops are only for interactive review, not for the workbook.
         # Replace any pipeline-provided path with the path chosen for this run.
         for record in daily_attendance.records:
-            if record.review_crop:
-                record.review_crop = None
+            record.review_crop = None
 
         daily_attendance.source_pdf_display_path = _source_pdf_path(
             pdf_path,
@@ -141,10 +135,10 @@ def run_batch(
         source_path_root=source_path_root,
     )
 
-    # Create nested output directories so the requested output path can be new.
-    # output_path.parent.mkdir(parents=True, exist_ok=True)
-    # export_attendance(dataframe, output_path)
-    # print(f"Done - {len(dataframe)} rows written to {output_path}")
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    export_attendance(attendance_batch, output_path)
+    record_count = sum(len(sheet.records) for sheet in attendance_batch.attendance_sheets)
+    print(f"Done - {record_count} rows written to {output_path}")
     return output_path
 
 
