@@ -71,7 +71,7 @@ The bundled roster is used by default. Pass `--roster .\data\student_roster_26.t
 
 ### Build and run with Docker
 
-GitHub Actions builds and smoke-tests the Docker image on pushes to `main` or `feature/headless-cli`, pull requests targeting `main`, and manual workflow runs. The workflow does not publish the image.
+GitHub Actions builds and smoke-tests the Docker image on pushes to `main`, pull requests targeting `main`, and manual workflow runs. The workflow does not publish the image.
 
 To run it locally on a machine with Docker installed, build the image from the repository root:
 
