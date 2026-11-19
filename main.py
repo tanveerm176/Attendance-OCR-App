@@ -119,17 +119,8 @@ def main():
         review_callback=lambda attendance: review_flagged_records(attendance, roster)
     )
 
-    # Flatten Records
-    # student_records = itertools.chain.from_iterable(sheet.records for sheet in attendance_batch.attendance_sheets)
-    # for record in student_records:
-    #     print(record.match_flag, " ",record.match_score, " ", record.review_crop)
-
-    # pd.set_option('display.max_rows', None)
-    # pd.set_option('display.max_colwidth', None)
-    # print(df)
-
-    # output_path = build_excel_output(folder_path)
-    # export_attendance(df, output_path)
+    output_path = build_excel_output(attendance_batch.source_folder)
+    export_attendance(attendance_batch, output_path)
 
 
     # print(f"Done - {len(df)} rows written to {output_path}")

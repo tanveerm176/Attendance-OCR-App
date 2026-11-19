@@ -6,6 +6,7 @@ from urllib.parse import quote
 
 from io_utils.excel_formatting import format_attendance_worksheet
 from openpyxl.styles import Alignment
+from ocr_pipeline.models import AttendanceBatch
 
 
 OUTPUT_COLUMNS = {
@@ -21,7 +22,59 @@ SOURCE_PDF_PATH_COLUMN = "source_pdf_path"
 SOURCE_PDF_PATH_HEADER = "Source PDF Path"
 
 
-def export_attendance(df: pd.DataFrame, output_path: Path) -> None:
+def export_attendance(attendance_batch: AttendanceBatch, output_path: Path) -> None:
+
+    
+    # Tuples are immutable and use less memory for dictionaries
+    # student_rows = ((
+    #         record.record_index,
+    #         sheet.sheet_date,
+    #         record.ocr_name,
+    #         record.cleaned_name,
+    #         record.matched_name,
+    #         record.match_score,
+    #         record.match_flag,
+    #         record.attendance_status
+    # )
+    #     for sheet in attendance_batch.attendance_sheets
+    #     for record in sheet.records
+    # )
+
+    # student_columns = [
+    #     "Date",
+    #     "ocr_raw",
+    #     "cleaned_name",
+    #     "matched_name",
+    #     "matched_score",
+    #     "flag",
+    #     "attendance"
+    #     ]
+
+    # df = pd.DataFrame(student_rows, student_columns)
+
+    columns = {
+    "Date": [],
+    "ocr_raw": [],
+    "cleaned_name": [],
+    "matched_name": [],
+    "matched_score": [],
+    "flag": [],
+    "attendance": [],
+    }
+
+    for sheet in attendance_batch.attendance_sheets:
+        for record in sheet.records:
+            columns["Date"].append(sheet.sheet_date)
+            columns["ocr_raw"].append(record.ocr_name)
+            columns["cleaned_name"].append(record.cleaned_name)
+            columns["matched_name"].append(record.matched_name)
+            columns["matched_score"].append(record.match_score)
+            columns["flag"].append(record.match_flag)
+            columns["attendance"].append(record.attendance_status)
+
+    df = pd.DataFrame(columns)
+
+
     if "Date" not in df.columns:
         raise ValueError("Attendance data must contain a 'Date' column")
     if df.empty:
@@ -106,6 +159,15 @@ def _merge_source_pdf_paths(worksheet: Worksheet) -> None:
         ):
             end_row += 1
 
+        if source_path is None or source_path == "":
+            row += 1
+            continue
+
+        if not isinstance(source_path, str):
+            raise TypeError(
+                f"Expected a source PDF path string, got {type(source_path).__name__}"
+            )
+
         source_name = _source_pdf_name(source_path)
         source_uri = _source_pdf_uri(source_path)
         if end_row > row:
@@ -116,6 +178,7 @@ def _merge_source_pdf_paths(worksheet: Worksheet) -> None:
                 end_column=source_column,
             )
         source_cell = worksheet.cell(row=row, column=source_column)
+
         source_cell.value = source_name
         source_cell.hyperlink = source_uri
         source_cell.style = "Hyperlink"
